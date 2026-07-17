@@ -147,7 +147,7 @@
             padding: 12px;
             border-radius: 6px;
             font-size: 1rem;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             border: 1px solid var(--border-color);
             background: #2a2a2a;
             color: #fff;
@@ -712,17 +712,7 @@
         if (savedUser) {
             currentUser = savedUser;
             isAdmin = ADMINS.includes(savedUser);
-            if (isAdmin) {
-                const pin = prompt(`Willkommen zurück, ${currentUser}. Bitte Admin-PIN eingeben:`);
-                if (pin === ADMIN_PIN) {
-                    showApp();
-                } else {
-                    alert("Falsche PIN!");
-                    handleLogout();
-                }
-            } else {
-                showApp();
-            }
+            showApp();
         } else {
             document.getElementById('main-app').classList.add('hidden');
             document.getElementById('login-screen').classList.remove('hidden');
@@ -731,8 +721,9 @@
 
     function handleLogin() {
         const selected = document.getElementById('user-select').value;
+        
         if (ADMINS.includes(selected)) {
-            const pin = prompt("Bitte Admin-PIN eingeben:");
+            const pin = prompt(`Bitte Admin-PIN für ${selected} eingeben:`);
             if (pin === ADMIN_PIN) {
                 currentUser = selected;
                 isAdmin = true;
@@ -742,10 +733,38 @@
                 alert("Falsche PIN!");
             }
         } else {
-            currentUser = selected;
-            isAdmin = false;
-            localStorage.setItem('ek_logged_user', currentUser);
-            showApp();
+            // Fahrer-Login mit individuellem Passwort (fallback auf ADMIN_PIN wenn keins gesetzt)
+            loadDataFromSheetForLogin(selected);
+        }
+    }
+
+    async function loadDataFromSheetForLogin(selectedDriver) {
+        showLoading(true, "Überprüfe Login...");
+        try {
+            const response = await fetch(SHEET_API_URL);
+            if (response.ok) {
+                const resJson = await response.json();
+                data = resJson.entries || {};
+                
+                const pwdKey = `pwd_${selectedDriver}`;
+                const savedPwd = data[pwdKey] || ADMIN_PIN; // Standardmäßig Admin-PIN falls leer
+
+                const enteredPwd = prompt(`Bitte Passwort für ${selectedDriver} eingeben:`);
+                if (enteredPwd === savedPwd) {
+                    currentUser = selectedDriver;
+                    isAdmin = false;
+                    localStorage.setItem('ek_logged_user', currentUser);
+                    showApp();
+                } else {
+                    alert("Falsches Passwort!");
+                }
+            } else {
+                alert("Netzwerkfehler beim Login.");
+            }
+        } catch (e) {
+            alert("Fehler beim Verbinden zur Tabelle.");
+        } finally {
+            showLoading(false);
         }
     }
 
@@ -908,6 +927,22 @@
         }
     }
 
+    function updateDriverPassword(driver) {
+        const pwdKey = `pwd_${driver}`;
+        const currentPwd = data[pwdKey] || "";
+        const newPwd = prompt(`Neues Passwort für ${driver} festlegen:`, currentPwd);
+        
+        if (newPwd !== null) {
+            if (newPwd.trim() === "") {
+                delete data[pwdKey]; // Kein Passwort = Standard-PIN greift
+            } else {
+                data[pwdKey] = newPwd.trim();
+            }
+            saveDataToSheet();
+            alert(`Passwort für ${driver} wurde aktualisiert!`);
+        }
+    }
+
     function renderLists(year, month) {
         plannedListBody.innerHTML = '';
         workedListBody.innerHTML = '';
@@ -987,7 +1022,6 @@
             const pool = fahrerStundenPool[driver];
             totalHoursAllDrivers += pool.total;
 
-            // Berechnung: (Geleistete Std + Übertrag) - Soll (40h)
             const bilanz = (pool.total + pool.carryover) - SOLL_STUNDEN;
             const bilanzColor = bilanz >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
             const bilanzSign = bilanz > 0 ? '+' : '';
@@ -1001,8 +1035,9 @@
                 detailsHtml = `<tr><td colspan="5"><table class="sub-details-table">`;
                 
                 if (isAdmin) {
-                    detailsHtml += `<tr><td colspan="4" style="background:#202020; padding:8px;">
-                        <button class="btn btn-secondary" style="font-size:0.75rem; padding:6px; width:auto;" onclick="updateCarryover(${year}, ${month}, '${driver}')">+/- Übertrag anpassen (Aktuell: ${pool.carryover.toFixed(2).replace('.', ',')} Std)</button>
+                    detailsHtml += `<tr><td colspan="4" style="background:#202020; padding:8px; display:flex; flex-direction:column; gap:6px;">
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding:6px; width:100%;" onclick="updateCarryover(${year}, ${month}, '${driver}')">+/- Übertrag anpassen (Aktuell: ${pool.carryover.toFixed(2).replace('.', ',')} Std)</button>
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding:6px; width:100%; background:#2c3e50;" onclick="updateDriverPassword('${driver}')">🔑 Passwort festlegen</button>
                     </td></tr>`;
                 }
 
