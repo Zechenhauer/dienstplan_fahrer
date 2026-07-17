@@ -14,6 +14,7 @@
             --success-color: #4caf50;
             --danger-color: #ff5252;
             --border-color: #333;
+            --today-bg: rgba(255, 152, 0, 0.15);
         }
 
         * {
@@ -225,12 +226,27 @@
             overflow: hidden;
         }
 
+        /* Highlight für den aktuellen Tag */
+        .day.today {
+            background: var(--today-bg);
+            border-color: var(--accent-color);
+            box-shadow: inset 0 0 8px rgba(255, 152, 0, 0.3);
+        }
+        .day.today > div:first-child {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
         body.admin-mode .day {
             cursor: pointer;
         }
         body.admin-mode .day:hover {
             border-color: #fff;
             background: #2d2d2d;
+        }
+        body.admin-mode .day.today:hover {
+            border-color: var(--accent-color);
+            background: rgba(255, 152, 0, 0.25);
         }
 
         .day.empty {
@@ -252,21 +268,25 @@
         .day-driver-badge {
             color: #000;
             font-weight: bold;
-            padding: 1px 3px;
+            padding: 2px 3px;
             border-radius: 3px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             text-align: center;
             line-height: 1.1;
+            border: 1px solid transparent;
+        }
+
+        /* Status-Unterscheidung bei persönlicher Fahrerfarbe */
+        .day-driver-badge.planned {
+            opacity: 0.65;
+            border: 1.5px dashed rgba(0,0,0,0.5);
         }
 
         .day-driver-badge.worked {
-            background: var(--success-color);
-        }
-
-        .day-driver-badge.planned {
-            background: var(--accent-color);
+            opacity: 1;
+            border: 1.5px solid rgba(0,0,0,0.2);
         }
 
         .work-list {
@@ -550,6 +570,18 @@
     const ADMINS = ["Jürgen", "Dirk", "Michael", "Thorsten"];
     const FAHRER_LISTE = ["Jürgen", "Detlef", "Hans-Peter", "Fahrer 4", "Fahrer 5", "Fahrer 6", "Fahrer 7", "Fahrer 8"];
 
+    // Feste Farbpalette für die Fahrer-Badges (Gut lesbar, kontrastreich)
+    const FAHRER_FARBEN = {
+        "Jürgen": "#81c784",      // Soft Green
+        "Detlef": "#64b5f6",      // Soft Blue
+        "Hans-Peter": "#ffb74d",  // Soft Orange
+        "Fahrer 4": "#ba68c8",    // Soft Purple
+        "Fahrer 5": "#4db6ac",    // Teal
+        "Fahrer 6": "#ff8a65",    // Light Coral
+        "Fahrer 7": "#e0e0e0",    // Hellgrau
+        "Fahrer 8": "#a1887f"     // Hellbraun
+    };
+
     let currentUser = null;
     let isAdmin = false;
     let sessionAdminVerified = false;
@@ -733,6 +765,12 @@
         const adjustedFirstDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
         const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+        // Heutiges reales Datum holen
+        const heute = new Date();
+        const heuteTag = heute.getDate();
+        const heuteMonat = heute.getMonth();
+        const heuteJahr = heute.getFullYear();
+
         for (let i = 0; i < adjustedFirstDay; i++) {
             const emptyDiv = document.createElement('div');
             emptyDiv.className = 'day empty';
@@ -742,6 +780,12 @@
         for (let day = 1; day <= daysInMonth; day++) {
             const dayDiv = document.createElement('div');
             dayDiv.className = 'day';
+            
+            // Prüfen ob dieser Tag "Heute" ist
+            if (day === heuteTag && month === heuteMonat && year === heuteJahr) {
+                dayDiv.classList.add('today');
+            }
+
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             
             const dayNum = document.createElement('div');
@@ -760,7 +804,15 @@
                 if (isAdmin || assign.driver === currentUser) {
                     const badge = document.createElement('div');
                     badge.className = `day-driver-badge ${assign.status}`;
-                    badge.textContent = `${assign.driver.substring(0,6)}: ${assign.tour}`;
+                    
+                    // Persönliche Fahrerfarbe aus der Palette zuweisen (Fallback auf Grau falls unbekannt)
+                    const fahrerFarbe = FAHRER_FARBEN[assign.driver] || "#e0e0e0";
+                    badge.style.backgroundColor = fahrerFarbe;
+
+                    // Text-Anzeige: Bei erledigten Touren spendieren wir ein kleines Häkchen
+                    const statusIcon = assign.status === 'worked' ? '✓ ' : '';
+                    badge.textContent = `${statusIcon}${assign.driver.substring(0,6)}: ${assign.tour}`;
+                    
                     driverListDiv.appendChild(badge);
                 }
             });
@@ -816,9 +868,12 @@
             const hrs = parseFloat(item.hours || 0);
             const tr = document.createElement('tr');
 
+            // Fahrer-Name in der Liste bekommt ebenfalls einen dezenten Farbpunkt passend zum Fahrer
+            const punktFarbe = FAHRER_FARBEN[item.driver] || "#e0e0e0";
+
             tr.innerHTML = `
                 <td>${displayDate}</td>
-                <td><strong>${item.driver}</strong></td>
+                <td><span style="display:inline-block; width:8px; height:8px; background:${punktFarbe}; border-radius:50%; margin-right:6px;"></span><strong>${item.driver}</strong></td>
                 <td><span style="color: var(--accent-color);">${item.tour}</span></td>
                 <td>${hrs.toFixed(2).replace('.', ',')} Std.</td>
                 <td class="admin-only">
