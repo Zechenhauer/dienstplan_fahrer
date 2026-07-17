@@ -548,7 +548,7 @@
     <div class="work-list">
         <div class="list-title title-worked">
             <span id="worked-list-title">Geleistete Stunden (Monatsübersicht)</span>
-            <span class="count-badge hours-total" id="totalHoursBadge">0,00 Std. Gesamt</span>
+            <span class="count-badge hours-total" id="totalHoursBadge" style="display: none;">0,00 Std. Gesamt</span>
         </div>
         <div class="table-responsive">
             <table>
@@ -872,7 +872,6 @@
 
             dayDiv.appendChild(driverListDiv);
 
-            // KLICK steuert die Anzeige UND öffnet als Admin direkt die Planung
             dayDiv.onclick = () => {
                 activeSelectedDateStr = dateStr;
                 render();
@@ -954,7 +953,8 @@
                             key: key,
                             index: index,
                             tour: assign.tour,
-                            hours: hrs
+                            hours: hrs,
+                            editor: assign.bearbeitet_von || "Unbekannt"
                         });
                     }
                 }
@@ -974,10 +974,14 @@
                 detailsHtml = `<tr><td colspan="3"><table class="sub-details-table">`;
                 pool.touren.sort((a,b) => b.key.localeCompare(a.key)).forEach(t => {
                     const [ty, tm, td] = t.key.split('-');
+                    
+                    // Zeigt den Bearbeiter NUR den Admins in den Tour-Details an
+                    const editorInfo = isAdmin ? `<span style="color:var(--text-muted); font-size:0.75rem; font-style:italic; margin-left:10px;">(geändert von: ${t.editor})</span>` : '';
+                    
                     detailsHtml += `
                         <tr>
                             <td style="color:var(--text-muted)">${td}.${tm}.${ty}</td>
-                            <td style="color:#64b5f6">${t.tour}</td>
+                            <td style="color:#64b5f6">${t.tour} ${editorInfo}</td>
                             <td style="text-align:right; font-weight:bold; color:var(--success-color)">${t.hours.toFixed(2).replace('.', ',')} Std.</td>
                             ${isAdmin ? `<td style="text-align:right; width:90px;">
                                 <span style="cursor:pointer; color:var(--text-muted); margin-right:8px;" onclick="revertToPlanned('${t.key}', ${t.index})">Reset</span>
