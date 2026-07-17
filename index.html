@@ -26,9 +26,9 @@
         .card h2 { font-size: 1rem; margin-bottom: 12px; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
         
         /* Login Screen */
-        #login-screen { position: fixed; top:0; left:0; width:100%; height:100%; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
+        #login-screen { position: fixed; top:0; left:0; width:100%; height:100%; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px; }
         #login-screen h2 { margin-bottom: 20px; }
-        .login-select { width: 100%; max-width: 300px; padding: 12px; border-radius: 6px; font-size: 1rem; margin-bottom: 15px; border: none; }
+        .login-select { width: 100%; max-width: 300px; padding: 12px; border-radius: 6px; font-size: 1rem; margin-bottom: 15px; border: none; background: white; color: var(--text); }
         .login-btn { width: 100%; max-width: 300px; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; }
         
         /* Form Styles */
@@ -56,7 +56,7 @@
 <body>
 
     <!-- LOGIN SCREEN -->
-    <div id="login-screen">
+    <div id="login-screen" class="hidden">
         <h2>Eisen Krämer Login</h2>
         <p style="margin-bottom: 15px; font-size: 0.9rem; color: #cbd5e1;">Bitte wählen Sie Ihren Namen aus:</p>
         <select id="user-select" class="login-select">
@@ -73,83 +73,84 @@
         <button onclick="handleLogin()" class="login-btn">Anmelden</button>
     </div>
 
-    <!-- APP HEADER -->
-    <header>
-        <h1>Eisen Krämer Tourenplaner</h1>
-        <div class="user-info" id="user-display">Angemeldet als: -</div>
-        <button class="logout-btn" onclick="handleLogout()">Abmelden</button>
-    </header>
+    <!-- MAIN APP WRAPPER -->
+    <div id="main-app" class="hidden">
+        <!-- APP HEADER -->
+        <header>
+            <h1>Eisen Krämer Tourenplaner</h1>
+            <div class="user-info" id="user-display">Angemeldet als: -</div>
+            <button class="logout-btn" onclick="handleLogout()">Abmelden</button>
+        </header>
 
-    <!-- MAIN CONTENT -->
-    <div class="container">
-        
-        <!-- TAB 1: MEINE TOUREN / AKTUELLE TOUREN -->
-        <div id="tab-touren" class="tab-content">
-            <div class="card">
-                <h2 id="list-title">Meine anstehenden Touren</h2>
-                <div id="tour-list-container">
-                    <!-- Einträge werden dynamisch geladen -->
+        <!-- MAIN CONTENT -->
+        <div class="container">
+            
+            <!-- TAB 1: MEINE TOUREN -->
+            <div id="tab-touren" class="tab-content">
+                <div class="card">
+                    <h2 id="list-title">Meine anstehenden Touren</h2>
+                    <div id="tour-list-container">
+                        <!-- Einträge werden dynamisch geladen -->
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- TAB 2: DISPOSITION (NUR ADMINS) -->
-        <div id="tab-dispo" class="tab-content hidden">
-            <div class="card">
-                <h2>Neue Tour einplanen</h2>
-                <form id="tour-form" onsubmit="saveTour(event)">
-                    <div class="form-group">
-                        <label>Datum</label>
-                        <input type="date" id="tour-date" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Fahrer zuweisen</label>
-                        <select id="tour-driver" required>
-                            <!-- Wird dynamisch befüllt -->
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Tour / Zielort</label>
-                        <input type="text" id="tour-destination" placeholder="z.B. Duisburg, Essen, Sondertour..." required>
-                    </div>
-                    <div class="form-group">
-                        <label>Geplante Stunden</label>
-                        <input type="number" id="tour-hours" value="6" min="1" max="24" required>
-                    </div>
-                    <button type="submit" class="btn btn-accent">Tour verbindlich eintragen</button>
-                </form>
+            <!-- TAB 2: DISPOSITION (NUR ADMINS) -->
+            <div id="tab-dispo" class="tab-content hidden">
+                <div class="card">
+                    <h2>Neue Tour einplanen</h2>
+                    <form id="tour-form" onsubmit="saveTour(event)">
+                        <div class="form-group">
+                            <label>Datum</label>
+                            <input type="date" id="tour-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Fahrer zuweisen</label>
+                            <select id="tour-driver" required>
+                                <!-- Wird dynamisch befüllt -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tour / Zielort</label>
+                            <input type="text" id="tour-destination" placeholder="z.B. Duisburg, Essen, Sondertour..." required>
+                        </div>
+                        <div class="form-group">
+                            <label>Geplante Stunden</label>
+                            <input type="number" id="tour-hours" value="6" min="1" max="24" required>
+                        </div>
+                        <button type="submit" class="btn btn-accent">Tour verbindlich eintragen</button>
+                    </form>
+                </div>
             </div>
+
         </div>
 
-    </div>
-
-    <!-- NAVIGATION BAR -->
-    <div class="nav-tabs">
-        <button class="tab-btn active" id="btn-tab-touren" onclick="switchTab('touren')">Tourenliste</button>
-        <button class="tab-btn hidden" id="btn-tab-dispo" onclick="switchTab('dispo')">⚙ Admin / Dispo</button>
+        <!-- NAVIGATION BAR -->
+        <div class="nav-tabs">
+            <button class="tab-btn active" id="btn-tab-touren" onclick="switchTab('touren')">Tourenliste</button>
+            <button class="tab-btn hidden" id="btn-tab-dispo" onclick="switchTab('dispo')">⚙ Admin / Dispo</button>
+        </div>
     </div>
 
     <script>
-        // GLOBALE KONFIGURATION
+        // CONFIG
         const ADMINS = ["Jürgen", "Dirk", "Michael", "Thorsten"];
-        // Hier kannst du später ganz einfach die echten Namen der 8 Fahrer eintragen:
         const FAHRER_LISTE = ["Fahrer 1", "Fahrer 2", "Fahrer 3", "Fahrer 4", "Fahrer 5", "Fahrer 6", "Fahrer 7", "Fahrer 8"];
         const ADMIN_PIN = "1919";
 
         let currentUser = null;
         let isAdmin = false;
+        let sessionAdminVerified = false; // Verhindert PIN-Abfrage bei jedem Tab-Wechsel innerhalb einer Sitzung
         
-        // Spieldaten (Lokaler Speicher oder Standard-Beispiel)
         let tourenDaten = JSON.parse(localStorage.getItem('ek_touren_daten')) || [
             { id: 1, datum: "2026-07-21", fahrer: "Fahrer 1", tour: "Moers", stunden: 6, bearbeitet_von: "System" },
             { id: 2, datum: "2026-07-22", fahrer: "Fahrer 2", tour: "Essen", stunden: 6, bearbeitet_von: "Jürgen" },
             { id: 3, datum: "2026-07-24", fahrer: "Jürgen", tour: "Düsseldorf", stunden: 6, bearbeitet_von: "Dirk" }
         ];
 
-        // Initialisierung beim Laden
         window.onload = function() {
             setupDropdowns();
-            checkSession();
+            checkSavedLogin();
         };
 
         function setupDropdowns() {
@@ -159,7 +160,6 @@
             fahrerGroup.innerHTML = "";
             formDriverSelect.innerHTML = "";
             
-            // Alle potenziellen Fahrer (inklusive Admins, falls diese auch fahren)
             const allePersonen = [...ADMINS, ...FAHRER_LISTE];
             
             FAHRER_LISTE.forEach(f => {
@@ -171,6 +171,32 @@
             });
         }
 
+        // Prüft ob bereits ein Nutzer auf diesem Gerät eingeloggt ist
+        function checkSavedLogin() {
+            const savedUser = localStorage.getItem('ek_logged_user');
+            if (savedUser) {
+                currentUser = savedUser;
+                isAdmin = ADMINS.includes(savedUser);
+                // Wenn es ein gemerkter Admin ist, verlangen wir beim ersten Laden einmal die PIN
+                if (isAdmin) {
+                    const pin = prompt(`Willkommen zurück, ${currentUser}. Bitte Admin-PIN eingeben:`);
+                    if (pin === ADMIN_PIN) {
+                        sessionAdminVerified = true;
+                        showApp();
+                    } else {
+                        alert("Falsche PIN! Bitte neu anmelden.");
+                        handleLogout();
+                    }
+                } else {
+                    showApp();
+                }
+            } else {
+                // Kein Nutzer gemerkt -> Login zeigen
+                document.getElementById('main-app').classList.add('hidden');
+                document.getElementById('login-screen').classList.remove('hidden');
+            }
+        }
+
         function handleLogin() {
             const selected = document.getElementById('user-select').value;
             
@@ -179,6 +205,8 @@
                 if (pin === ADMIN_PIN) {
                     currentUser = selected;
                     isAdmin = true;
+                    sessionAdminVerified = true;
+                    localStorage.setItem('ek_logged_user', currentUser); // Login merken
                     showApp();
                 } else {
                     alert("Falsche PIN! Zugriff verweigert.");
@@ -186,15 +214,17 @@
             } else {
                 currentUser = selected;
                 isAdmin = false;
+                localStorage.setItem('ek_logged_user', currentUser); // Login merken
                 showApp();
             }
         }
 
         function showApp() {
             document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            
             document.getElementById('user-display').innerText = `Angemeldet als: ${currentUser} ${isAdmin ? '(Admin)' : '(Fahrer)'}`;
             
-            // Berechtigungen für Ansichten steuern
             if (isAdmin) {
                 document.getElementById('btn-tab-dispo').classList.remove('hidden');
                 document.getElementById('list-title').innerText = "Gesamte Team-Touren Übersicht";
@@ -210,15 +240,23 @@
         function handleLogout() {
             currentUser = null;
             isAdmin = false;
+            sessionAdminVerified = false;
+            localStorage.removeItem('ek_logged_user'); // Gemerkten Login löschen
+            document.getElementById('main-app').classList.add('hidden');
             document.getElementById('login-screen').classList.remove('hidden');
         }
 
-        function checkSession() {
-            // Falls man die Seite neu lädt, muss man sich neu authentifizieren (Sicherheitsfeature)
-            handleLogout();
-        }
-
         function switchTab(tabName) {
+            // Falls ein Admin in den Dispo-Tab will, aber die PIN noch nicht in dieser Session verifiziert wurde
+            if (tabName === 'dispo' && isAdmin && !sessionAdminVerified) {
+                const pin = prompt("Bitte Admin-PIN verifizieren:");
+                if (pin !== ADMIN_PIN) {
+                    alert("Falsche PIN!");
+                    return;
+                }
+                sessionAdminVerified = true;
+            }
+
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             
@@ -236,7 +274,7 @@
                 fahrer: document.getElementById('tour-driver').value,
                 tour: document.getElementById('tour-destination').value,
                 stunden: parseInt(document.getElementById('tour-hours').value),
-                bearbeitet_von: currentUser // Hier protokollieren wir den angemeldeten Admin!
+                bearbeitet_von: currentUser
             };
 
             tourenDaten.push(newTour);
@@ -263,10 +301,7 @@
             const container = document.getElementById('tour-list-container');
             container.innerHTML = "";
 
-            // Sortieren nach Datum (nächste Termine oben)
             const sortierteTouren = [...tourenDaten].sort((a, b) => new Date(a.datum) - new Date(b.datum));
-
-            // Filtern: Admins sehen ALLES, Fahrer sehen NUR SICH SELBST
             const anzeigeTouren = isAdmin ? sortierteTouren : sortierteTouren.filter(t => t.fahrer === currentUser);
 
             if (anzeigeTouren.length === 0) {
@@ -280,7 +315,6 @@
                 let adminZusatz = "";
                 let loeschButton = "";
 
-                // Wenn der Admin guckt, zeigen wir das Bearbeitungsprotokoll und den Löschen-Button
                 if (isAdmin) {
                     adminZusatz = `<span class="protocol-tag">Fahrer: <b>${t.fahrer}</b> | Eingetragen von: ${t.bearbeitet_von || 'Unbekannt'}</span>`;
                     loeschButton = `<button class="delete-btn" onclick="deleteTour(${t.id})">❌</button>`;
