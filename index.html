@@ -6,59 +6,442 @@
     <title>Eisen Krämer - Team-Tourenplaner</title>
     <style>
         :root {
-            --primary: #1e293b;
-            --accent: #d97706;
-            --bg: #f8fafc;
-            --card-bg: #ffffff;
-            --text: #0f172a;
-            --border: #e2e8f0;
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-color: #ff9800; /* Eisen-Krämer-Orange */
+            --text-color: #e0e0e0;
+            --text-muted: #888;
+            --success-color: #4caf50;
+            --danger-color: #ff5252;
+            --border-color: #333;
             --admin-badge: #0284c7;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background: var(--bg); color: var(--text); padding-bottom: 60px; }
-        header { background: var(--primary); color: white; padding: 15px; text-align: center; position: relative; }
-        header h1 { font-size: 1.2rem; }
-        header .user-info { font-size: 0.85rem; color: #cbd5e1; margin-top: 4px; }
-        .logout-btn { position: absolute; right: 10px; top: 15px; background: rgba(255,255,255,0.2); color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; }
-        
-        .container { padding: 15px; max-width: 600px; margin: 0 auto; }
-        .card { background: var(--card-bg); border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .card h2 { font-size: 1rem; margin-bottom: 12px; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
-        
-        /* Login Screen */
-        #login-screen { position: fixed; top:0; left:0; width:100%; height:100%; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px; }
-        #login-screen h2 { margin-bottom: 20px; }
-        .login-select { width: 100%; max-width: 300px; padding: 12px; border-radius: 6px; font-size: 1rem; margin-bottom: 15px; border: none; background: white; color: var(--text); }
-        .login-btn { width: 100%; max-width: 300px; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; }
-        
-        /* Form Styles */
-        .form-group { margin-bottom: 12px; }
-        label { display: block; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600; }
-        input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
-        .btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 5px; }
-        .btn-accent { background: var(--accent); }
-        
-        /* List & Items */
-        .tour-item { border-left: 4px solid var(--accent); padding: 10px; margin-bottom: 10px; background: #f1f5f9; border-radius: 0 6px 6px 0; position: relative; }
-        .tour-item.admin-view { border-left-color: var(--admin-badge); }
-        .tour-meta { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
-        .protocol-tag { font-style: italic; color: var(--admin-badge); font-size: 0.75rem; margin-top: 2px; display: block; }
-        .delete-btn { position: absolute; right: 10px; top: 10px; color: #ef4444; background: none; border: none; font-size: 0.8rem; cursor: pointer; }
-        
-        /* Navigation Tabs */
-        .nav-tabs { display: flex; position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-top: 1px solid var(--border); z-index: 900; }
-        .tab-btn { flex: 1; padding: 12px; text-align: center; background: none; border: none; font-size: 0.85rem; color: #64748b; cursor: pointer; }
-        .tab-btn.active { color: var(--accent); font-weight: bold; border-top: 2px solid var(--accent); }
-        
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        /* Lade-Anzeige */
+        .loading-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            border-radius: 12px;
+            z-index: 5;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+            position: relative;
+        }
+
+        header h1 {
+            font-size: 1.3rem;
+            color: #fff;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        .user-info {
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            margin-top: 4px;
+            font-weight: bold;
+        }
+
+        .logout-btn {
+            position: absolute;
+            right: 0;
+            top: 0;
+            background: #333;
+            color: #fff;
+            border: 1px solid var(--border-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background: var(--danger-color);
+        }
+
+        /* --- LOGIN SCREEN OVERLAY --- */
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+        }
+        #login-screen .login-box {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+        #login-screen h2 {
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            color: #fff;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 8px;
+        }
+        .login-select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            background: #2a2a2a;
+            color: #fff;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-color);
+            color: #121212;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .login-btn:hover {
+            background: #ffb74d;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        select, input {
+            background: #2a2a2a;
+            color: #fff;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .filter-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        /* --- KALENDER-GRID --- */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 20px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            padding: 3px 0;
+        }
+
+        .day {
+            background: #252525;
+            aspect-ratio: 1 / 1.15;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            border-radius: 6px;
+            cursor: default;
+            position: relative;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1.5px solid transparent;
+            transition: all 0.2s;
+            padding: 4px 2px;
+            min-height: 60px;
+            overflow: hidden;
+        }
+
+        body.admin-mode .day {
+            cursor: pointer;
+        }
+        body.admin-mode .day:hover {
+            border-color: #fff;
+            background: #2d2d2d;
+        }
+
+        .day.empty {
+            background: transparent;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        .day-driver-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: auto;
+            font-size: 0.58rem;
+            overflow: hidden;
+        }
+
+        .day-driver-badge {
+            background: #3a3a3a;
+            color: #fff;
+            padding: 1px 3px;
+            border-radius: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+            line-height: 1.1;
+        }
+
+        .day-driver-badge.worked {
+            border-left: 3.5px solid var(--success-color);
+            background: rgba(76, 175, 80, 0.15);
+        }
+
+        .day-driver-badge.planned {
+            border-left: 3.5px solid var(--accent-color);
+            background: rgba(255, 152, 0, 0.15);
+        }
+
+        /* --- ARBEITSLISTEN --- */
+        .work-list {
+            margin-top: 20px;
+        }
+
+        .list-title {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            padding-left: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .title-planned { border-left: 3px solid var(--accent-color); }
+        .title-worked { border-left: 3px solid var(--success-color); }
+
+        .count-badge {
+            font-size: 0.75rem;
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 10px;
+            color: #fff;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            min-width: 500px;
+        }
+
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: normal;
+            background: #1a1a1a;
+        }
+
+        .no-entries {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 12px;
+            font-style: italic;
+        }
+
+        .protocol-tag {
+            font-style: italic;
+            color: var(--admin-badge);
+            font-size: 0.72rem;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .admin-only { display: none; }
+        body.admin-mode .admin-only { display: table-cell; }
+
+        .btn-action {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-right: 10px;
+            font-weight: bold;
+            padding: 6px 0;
+        }
+        .btn-delete { color: var(--danger-color); }
+        .btn-delete:hover { text-decoration: underline; }
+        .btn-complete { color: var(--success-color); }
+        .btn-complete:hover { text-decoration: underline; }
+
+        /* --- MODAL --- */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            padding: 10px;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 18px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal h3 {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+        .modal-driver-list {
+            max-height: 140px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 15px;
+            background: #181818;
+        }
+
+        .modal-driver-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid #2a2a2a;
+            font-size: 0.85rem;
+        }
+
+        .modal-select, .modal input {
+            background: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+            width: 100%;
+        }
+
+        .btn {
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: bold;
+            width: 100%;
+            text-align: center;
+        }
+        .btn-primary { background: var(--success-color); color: #fff; }
+        .btn-secondary { background: #444; color: #fff; }
+        .btn-danger { background: var(--danger-color); color: #fff; }
+
+        .input-group { display: none; }
+        .form-label { display: block; text-align: left; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+
         .hidden { display: none !important; }
+
+        @media (max-width: 480px) {
+            .controls { grid-template-columns: 1fr; gap: 6px; }
+            .day { font-size: 0.75rem; min-height: 55px; }
+            .day-driver-badge { font-size: 0.52rem; }
+        }
     </style>
 </head>
 <body>
 
-    <!-- LOGIN SCREEN -->
-    <div id="login-screen" class="hidden">
+<!-- LOGIN OVERLAY SCREEN -->
+<div id="login-screen" class="hidden">
+    <div class="login-box">
         <h2>Eisen Krämer Login</h2>
-        <p style="margin-bottom: 15px; font-size: 0.9rem; color: #cbd5e1;">Bitte wählen Sie Ihren Namen aus:</p>
+        <span class="form-label" style="text-align: center;">Wer meldet sich an?</span>
         <select id="user-select" class="login-select">
             <optgroup label="Admins">
                 <option value="Jürgen">Jürgen (Ich)</option>
@@ -67,269 +450,522 @@
                 <option value="Thorsten">Thorsten</option>
             </optgroup>
             <optgroup label="Fahrer" id="fahrer-optgroup">
-                <!-- Wird per JS befüllt -->
+                <!-- Wird dynamisch befüllt -->
             </optgroup>
         </select>
-        <button onclick="handleLogin()" class="login-btn">Anmelden</button>
+        <button onclick="handleLogin()" class="login-btn">Anmelden & Speichern</button>
     </div>
+</div>
 
-    <!-- MAIN APP WRAPPER -->
-    <div id="main-app" class="hidden">
-        <!-- APP HEADER -->
-        <header>
-            <h1>Eisen Krämer Tourenplaner</h1>
-            <div class="user-info" id="user-display">Angemeldet als: -</div>
-            <button class="logout-btn" onclick="handleLogout()">Abmelden</button>
-        </header>
+<!-- HAUPT APP WRAPPER -->
+<div class="container hidden" id="main-app">
+    <div class="loading-overlay" id="loadingOverlay">Daten werden geladen...</div>
 
-        <!-- MAIN CONTENT -->
-        <div class="container">
-            
-            <!-- TAB 1: MEINE TOUREN -->
-            <div id="tab-touren" class="tab-content">
-                <div class="card">
-                    <h2 id="list-title">Meine anstehenden Touren</h2>
-                    <div id="tour-list-container">
-                        <!-- Einträge werden dynamisch geladen -->
-                    </div>
-                </div>
-            </div>
+    <header>
+        <h1>Eisen Krämer - Team-Tourenplaner</h1>
+        <div class="subtitle">Zentrale Routen- & Fahrerplanung</div>
+        <div class="user-info" id="user-display">Angemeldet als: -</div>
+        <button class="logout-btn" onclick="handleLogout()">Abmelden</button>
+    </header>
 
-            <!-- TAB 2: DISPOSITION (NUR ADMINS) -->
-            <div id="tab-dispo" class="tab-content hidden">
-                <div class="card">
-                    <h2>Neue Tour einplanen</h2>
-                    <form id="tour-form" onsubmit="saveTour(event)">
-                        <div class="form-group">
-                            <label>Datum</label>
-                            <input type="date" id="tour-date" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Fahrer zuweisen</label>
-                            <select id="tour-driver" required>
-                                <!-- Wird dynamisch befüllt -->
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Tour / Zielort</label>
-                            <input type="text" id="tour-destination" placeholder="z.B. Duisburg, Essen, Sondertour..." required>
-                        </div>
-                        <div class="form-group">
-                            <label>Geplante Stunden</label>
-                            <input type="number" id="tour-hours" value="6" min="1" max="24" required>
-                        </div>
-                        <button type="submit" class="btn btn-accent">Tour verbindlich eintragen</button>
-                    </form>
-                </div>
-            </div>
-
+    <div class="controls">
+        <div>
+            <span class="filter-label">Monat</span>
+            <select id="monthSelect"></select>
         </div>
-
-        <!-- NAVIGATION BAR -->
-        <div class="nav-tabs">
-            <button class="tab-btn active" id="btn-tab-touren" onclick="switchTab('touren')">Tourenliste</button>
-            <button class="tab-btn hidden" id="btn-tab-dispo" onclick="switchTab('dispo')">⚙ Admin / Dispo</button>
+        <div>
+            <span class="filter-label">Jahr</span>
+            <select id="yearSelect"></select>
         </div>
     </div>
 
-    <script>
-        // CONFIG
-        const ADMINS = ["Jürgen", "Dirk", "Michael", "Thorsten"];
-        const FAHRER_LISTE = ["Fahrer 1", "Fahrer 2", "Fahrer 3", "Fahrer 4", "Fahrer 5", "Fahrer 6", "Fahrer 7", "Fahrer 8"];
-        const ADMIN_PIN = "1919";
+    <!-- DAS SCHÖNE KALENDER-GRID -->
+    <div class="calendar-grid" id="calendar">
+        <div class="weekday">Mo</div>
+        <div class="weekday">Di</div>
+        <div class="weekday">Mi</div>
+        <div class="weekday">Do</div>
+        <div class="weekday">Fr</div>
+        <div class="weekday">Sa</div>
+        <div class="weekday">So</div>
+    </div>
 
-        let currentUser = null;
-        let isAdmin = false;
-        let sessionAdminVerified = false; // Verhindert PIN-Abfrage bei jedem Tab-Wechsel innerhalb einer Sitzung
+    <!-- TABELLE 1: GEPLANTE TOUREN -->
+    <div class="work-list">
+        <div class="list-title title-planned">
+            <span id="planned-list-title">Geplante Touren</span>
+            <span class="count-badge" id="countPlanned">0</span>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Fahrer</th>
+                        <th>Tour</th>
+                        <th>Geplante Std.</th>
+                        <th class="admin-only">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody id="plannedListBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TABELLE 2: ABSOLVIERTE TOUREN -->
+    <div class="work-list">
+        <div class="list-title title-worked">
+            <span id="worked-list-title">Absolvierte Fahrten (Erledigt)</span>
+            <span class="count-badge" id="countWorked">0</span>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Fahrer</th>
+                        <th>Tour</th>
+                        <th>Geleistete Std.</th>
+                        <th class="admin-only">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody id="workedListBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- TEAM-VERWALTUNGS-MODAL (NUR ADMINS) -->
+<div class="modal" id="actionModal">
+    <div class="modal-content">
+        <h3 id="modalDateLabel">Tag verwalten</h3>
         
-        let tourenDaten = JSON.parse(localStorage.getItem('ek_touren_daten')) || [
-            { id: 1, datum: "2026-07-21", fahrer: "Fahrer 1", tour: "Moers", stunden: 6, bearbeitet_von: "System" },
-            { id: 2, datum: "2026-07-22", fahrer: "Fahrer 2", tour: "Essen", stunden: 6, bearbeitet_von: "Jürgen" },
-            { id: 3, datum: "2026-07-24", fahrer: "Jürgen", tour: "Düsseldorf", stunden: 6, bearbeitet_von: "Dirk" }
-        ];
+        <div class="form-label">Eingeteilte Fahrer an diesem Tag:</div>
+        <div class="modal-driver-list" id="modalActiveDriversList"></div>
 
-        window.onload = function() {
-            setupDropdowns();
-            checkSavedLogin();
-        };
+        <div id="decisionGroup" style="display: flex; flex-direction: column; gap: 8px;">
+            <button class="btn btn-primary" onclick="showAddDriverForm()">+ Neuen Fahrer einteilen</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Schließen</button>
+        </div>
 
-        function setupDropdowns() {
-            const fahrerGroup = document.getElementById('fahrer-optgroup');
-            const formDriverSelect = document.getElementById('tour-driver');
-            
-            fahrerGroup.innerHTML = "";
-            formDriverSelect.innerHTML = "";
-            
-            const allePersonen = [...ADMINS, ...FAHRER_LISTE];
-            
-            FAHRER_LISTE.forEach(f => {
-                fahrerGroup.innerHTML += `<option value="${f}">${f}</option>`;
-            });
+        <div id="addDriverGroup" class="input-group">
+            <span class="form-label">Fahrer auswählen:</span>
+            <select id="modalDriverSelect" class="modal-select"></select>
 
-            allePersonen.forEach(p => {
-                formDriverSelect.innerHTML += `<option value="${p}">${p}</option>`;
-            });
+            <span class="form-label">Tour auswählen:</span>
+            <select id="modalTourSelect" class="modal-select">
+                <option value="Essen">Essen</option>
+                <option value="Moers">Moers</option>
+                <option value="Düsseldorf">Düsseldorf</option>
+                <option value="Duisburg">Duisburg</option>
+                <option value="Sondertour">Sondertour</option>
+            </select>
+
+            <span class="form-label">Status:</span>
+            <select id="modalStatusSelect" class="modal-select" onchange="toggleHoursInputLimit()">
+                <option value="planned">Geplant (Tour steht an)</option>
+                <option value="worked">Erledigt (Arbeitszeit verbuchen)</option>
+            </select>
+            
+            <span class="form-label">Stunden:</span>
+            <input type="number" id="modalHoursInput" step="0.25" min="0" max="24" placeholder="z.B. 7.5">
+            
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                <button class="btn btn-secondary" onclick="backToDecision()">Zurück</button>
+                <button class="btn btn-primary" onclick="saveDriverAssignment()">Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // DEINE NEUE WEB-APP-URL AUS SCHRITT 3
+    const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbw78NXPd0ygZeskt9A1cua_IZCWWo1Y2GY9JPR0vUpBNVO_DOZuY2XvCjl5dZYN639amA/exec";
+    const ADMIN_PIN = "1919";
+
+    const ADMINS = ["Jürgen", "Dirk", "Michael", "Thorsten"];
+    const FAHRER_LISTE = ["Fahrer 1", "Fahrer 2", "Fahrer 3", "Fahrer 4", "Fahrer 5", "Fahrer 6", "Fahrer 7", "Fahrer 8"];
+
+    let currentUser = null;
+    let isAdmin = false;
+    let sessionAdminVerified = false;
+
+    let selectedDateStr = "";
+    let data = {}; 
+
+    const months = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect = document.getElementById('yearSelect');
+    const calendar = document.getElementById('calendar');
+    const plannedListBody = document.getElementById('plannedListBody');
+    const workedListBody = document.getElementById('workedListBody');
+    const countPlannedEl = document.getElementById('countPlanned');
+    const countWorkedEl = document.getElementById('countWorked');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    
+    const actionModal = document.getElementById('actionModal');
+    const modalDateLabel = document.getElementById('modalDateLabel');
+    const modalActiveDriversList = document.getElementById('modalActiveDriversList');
+    const decisionGroup = document.getElementById('decisionGroup');
+    const addDriverGroup = document.getElementById('addDriverGroup');
+    const modalDriverSelect = document.getElementById('modalDriverSelect');
+    const modalHoursInput = document.getElementById('modalHoursInput');
+
+    window.onload = function() {
+        setupDropdowns();
+        checkSavedLogin();
+    };
+
+    function setupDropdowns() {
+        // Befülle Login-Dropdown
+        const fahrerGroup = document.getElementById('fahrer-optgroup');
+        fahrerGroup.innerHTML = "";
+        FAHRER_LISTE.forEach(f => {
+            fahrerGroup.innerHTML += `<option value="${f}">${f}</option>`;
+        });
+
+        // Befülle Modal-Dropdown (für Admin-Zuweisung)
+        modalDriverSelect.innerHTML = "";
+        [...ADMINS, ...FAHRER_LISTE].forEach(p => {
+            modalDriverSelect.innerHTML += `<option value="${p}">${p}</option>`;
+        });
+
+        // Befülle Monate & Jahre
+        months.forEach((m, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = m;
+            monthSelect.appendChild(opt);
+        });
+        monthSelect.value = 6; // Juli standardmäßig
+
+        for (let y = 2025; y <= 2028; y++) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            yearSelect.appendChild(opt);
         }
+        yearSelect.value = 2026;
 
-        // Prüft ob bereits ein Nutzer auf diesem Gerät eingeloggt ist
-        function checkSavedLogin() {
-            const savedUser = localStorage.getItem('ek_logged_user');
-            if (savedUser) {
-                currentUser = savedUser;
-                isAdmin = ADMINS.includes(savedUser);
-                // Wenn es ein gemerkter Admin ist, verlangen wir beim ersten Laden einmal die PIN
-                if (isAdmin) {
-                    const pin = prompt(`Willkommen zurück, ${currentUser}. Bitte Admin-PIN eingeben:`);
-                    if (pin === ADMIN_PIN) {
-                        sessionAdminVerified = true;
-                        showApp();
-                    } else {
-                        alert("Falsche PIN! Bitte neu anmelden.");
-                        handleLogout();
-                    }
-                } else {
-                    showApp();
-                }
-            } else {
-                // Kein Nutzer gemerkt -> Login zeigen
-                document.getElementById('main-app').classList.add('hidden');
-                document.getElementById('login-screen').classList.remove('hidden');
-            }
-        }
+        monthSelect.addEventListener('change', render);
+        yearSelect.addEventListener('change', render);
+    }
 
-        function handleLogin() {
-            const selected = document.getElementById('user-select').value;
-            
-            if (ADMINS.includes(selected)) {
-                const pin = prompt("Bitte Admin-PIN eingeben:");
+    function checkSavedLogin() {
+        const savedUser = localStorage.getItem('ek_logged_user');
+        if (savedUser) {
+            currentUser = savedUser;
+            isAdmin = ADMINS.includes(savedUser);
+            if (isAdmin) {
+                const pin = prompt(`Willkommen zurück, ${currentUser}. Bitte Admin-PIN eingeben:`);
                 if (pin === ADMIN_PIN) {
-                    currentUser = selected;
-                    isAdmin = true;
                     sessionAdminVerified = true;
-                    localStorage.setItem('ek_logged_user', currentUser); // Login merken
                     showApp();
                 } else {
-                    alert("Falsche PIN! Zugriff verweigert.");
+                    alert("Falsche PIN!");
+                    handleLogout();
                 }
             } else {
-                currentUser = selected;
-                isAdmin = false;
-                localStorage.setItem('ek_logged_user', currentUser); // Login merken
                 showApp();
             }
-        }
-
-        function showApp() {
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('main-app').classList.remove('hidden');
-            
-            document.getElementById('user-display').innerText = `Angemeldet als: ${currentUser} ${isAdmin ? '(Admin)' : '(Fahrer)'}`;
-            
-            if (isAdmin) {
-                document.getElementById('btn-tab-dispo').classList.remove('hidden');
-                document.getElementById('list-title').innerText = "Gesamte Team-Touren Übersicht";
-            } else {
-                document.getElementById('btn-tab-dispo').classList.add('hidden');
-                document.getElementById('list-title').innerText = `Meine Touren (${currentUser})`;
-                switchTab('touren');
-            }
-            
-            renderTouren();
-        }
-
-        function handleLogout() {
-            currentUser = null;
-            isAdmin = false;
-            sessionAdminVerified = false;
-            localStorage.removeItem('ek_logged_user'); // Gemerkten Login löschen
+        } else {
             document.getElementById('main-app').classList.add('hidden');
             document.getElementById('login-screen').classList.remove('hidden');
         }
+    }
 
-        function switchTab(tabName) {
-            // Falls ein Admin in den Dispo-Tab will, aber die PIN noch nicht in dieser Session verifiziert wurde
-            if (tabName === 'dispo' && isAdmin && !sessionAdminVerified) {
-                const pin = prompt("Bitte Admin-PIN verifizieren:");
-                if (pin !== ADMIN_PIN) {
-                    alert("Falsche PIN!");
-                    return;
-                }
+    function handleLogin() {
+        const selected = document.getElementById('user-select').value;
+        if (ADMINS.includes(selected)) {
+            const pin = prompt("Bitte Admin-PIN eingeben:");
+            if (pin === ADMIN_PIN) {
+                currentUser = selected;
+                isAdmin = true;
                 sessionAdminVerified = true;
+                localStorage.setItem('ek_logged_user', currentUser);
+                showApp();
+            } else {
+                alert("Falsche PIN!");
             }
-
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            
-            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
-            document.getElementById(`btn-tab-${tabName}`).classList.add('active');
+        } else {
+            currentUser = selected;
+            isAdmin = false;
+            localStorage.setItem('ek_logged_user', currentUser);
+            showApp();
         }
+    }
 
-        function saveTour(e) {
-            e.preventDefault();
-            if (!isAdmin) return alert("Nur Admins dürfen Touren eintragen.");
+    function handleLogout() {
+        currentUser = null;
+        isAdmin = false;
+        sessionAdminVerified = false;
+        localStorage.removeItem('ek_logged_user');
+        document.body.classList.remove('admin-mode');
+        document.getElementById('main-app').classList.add('hidden');
+        document.getElementById('login-screen').classList.remove('hidden');
+    }
 
-            const newTour = {
-                id: Date.now(),
-                datum: document.getElementById('tour-date').value,
-                fahrer: document.getElementById('tour-driver').value,
-                tour: document.getElementById('tour-destination').value,
-                stunden: parseInt(document.getElementById('tour-hours').value),
-                bearbeitet_von: currentUser
-            };
-
-            tourenDaten.push(newTour);
-            localStorage.setItem('ek_touren_daten', JSON.stringify(tourenDaten));
-            
-            document.getElementById('tour-form').reset();
-            document.getElementById('tour-hours').value = 6;
-            
-            alert("Tour erfolgreich gespeichert!");
-            switchTab('touren');
-            renderTouren();
+    function showApp() {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        document.getElementById('user-display').innerText = `Angemeldet als: ${currentUser} ${isAdmin ? '(Admin)' : '(Fahrer)'}`;
+        
+        if (isAdmin) {
+            document.body.classList.add('admin-mode');
+            document.getElementById('planned-list-title').innerText = "Geplante Touren (Teamübersicht)";
+            document.getElementById('worked-list-title').innerText = "Absolvierte Fahrten (Teamübersicht)";
+        } else {
+            document.body.classList.remove('admin-mode');
+            document.getElementById('planned-list-title').innerText = `Meine geplanten Touren`;
+            document.getElementById('worked-list-title').innerText = `Meine absolvierten Fahrten`;
         }
+        
+        loadDataFromSheet();
+    }
 
-        function deleteTour(id) {
-            if (!isAdmin) return alert("Nur Admins können Einträge löschen.");
-            if (confirm("Möchten Sie diese Tour wirklich löschen?")) {
-                tourenDaten = tourenDaten.filter(t => t.id !== id);
-                localStorage.setItem('ek_touren_daten', JSON.stringify(tourenDaten));
-                renderTouren();
+    async function loadDataFromSheet() {
+        showLoading(true, "Lade Daten...");
+        try {
+            const response = await fetch(SHEET_API_URL);
+            if (response.ok) {
+                const resJson = await response.json();
+                data = resJson.entries || {};
+                render();
             }
+        } catch (error) {
+            console.error("Fehler beim Laden:", error);
+        } finally {
+            showLoading(false);
         }
+    }
 
-        function renderTouren() {
-            const container = document.getElementById('tour-list-container');
-            container.innerHTML = "";
-
-            const sortierteTouren = [...tourenDaten].sort((a, b) => new Date(a.datum) - new Date(b.datum));
-            const anzeigeTouren = isAdmin ? sortierteTouren : sortierteTouren.filter(t => t.fahrer === currentUser);
-
-            if (anzeigeTouren.length === 0) {
-                container.innerHTML = `<p style="text-align:center; color:#64748b; padding:20px;">Keine anstehenden Touren gefunden.</p>`;
-                return;
-            }
-
-            anzeigeTouren.forEach(t => {
-                const formatDatum = new Date(t.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
-                
-                let adminZusatz = "";
-                let loeschButton = "";
-
-                if (isAdmin) {
-                    adminZusatz = `<span class="protocol-tag">Fahrer: <b>${t.fahrer}</b> | Eingetragen von: ${t.bearbeitet_von || 'Unbekannt'}</span>`;
-                    loeschButton = `<button class="delete-btn" onclick="deleteTour(${t.id})">❌</button>`;
-                }
-
-                container.innerHTML += `
-                    <div class="tour-item ${isAdmin ? 'admin-view' : ''}">
-                        ${loeschButton}
-                        <strong>${formatDatum}</strong> – ${t.tour}<br>
-                        <span class="tour-meta">Geplante Arbeitszeit: ${t.stunden} Std.</span>
-                        ${adminZusatz}
-                    </div>
-                `;
+    async function saveDataToSheet() {
+        showLoading(true, "Aktualisiere Google Tabelle...");
+        try {
+            const payload = { entries: data };
+            await fetch(SHEET_API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
+            setTimeout(loadDataFromSheet, 1200);
+        } catch (error) {
+            console.error("Fehler beim Speichern:", error);
+            showLoading(false);
         }
-    </script>
+    }
+
+    function render() {
+        const month = parseInt(monthSelect.value);
+        const year = parseInt(yearSelect.value);
+        renderCalendar(year, month);
+        renderLists(year, month);
+    }
+
+    function renderCalendar(year, month) {
+        const headers = calendar.querySelectorAll('.weekday');
+        calendar.innerHTML = '';
+        headers.forEach(h => calendar.appendChild(h));
+
+        const firstDayIndex = new Date(year, month, 1).getDay();
+        const adjustedFirstDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 0; i < adjustedFirstDay; i++) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'day empty';
+            calendar.appendChild(emptyDiv);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'day';
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            
+            const dayNum = document.createElement('div');
+            dayNum.textContent = day;
+            dayDiv.appendChild(dayNum);
+
+            const driverListDiv = document.createElement('div');
+            driverListDiv.className = 'day-driver-list';
+
+            let dayAssignments = data[dateStr] || [];
+            if (dayAssignments && !Array.isArray(dayAssignments)) dayAssignments = [];
+
+            dayAssignments.forEach(assign => {
+                // Ein Fahrer sieht im Kalender auch nur seine eigenen bunten Badges
+                if (isAdmin || assign.driver === currentUser) {
+                    const badge = document.createElement('div');
+                    badge.className = `day-driver-badge ${assign.status}`;
+                    badge.textContent = `${assign.driver.substring(0,6)}: ${assign.tour}`;
+                    driverListDiv.appendChild(badge);
+                }
+            });
+
+            dayDiv.appendChild(driverListDiv);
+
+            if (isAdmin) {
+                dayDiv.onclick = () => openModal(dateStr, day, months[month]);
+            }
+            calendar.appendChild(dayDiv);
+        }
+    }
+
+    function renderLists(year, month) {
+        plannedListBody.innerHTML = '';
+        workedListBody.innerHTML = '';
+        let countPlanned = 0;
+        let countWorked = 0;
+        const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+        const sortedKeys = Object.keys(data).filter(key => key.startsWith(prefix)).sort();
+
+        sortedKeys.forEach(key => {
+            let assignments = data[key] || [];
+            if (assignments && !Array.isArray(assignments)) assignments = [];
+
+            assignments.forEach((assign, index) => {
+                // Filtern: Fahrer sehen nur sich selbst
+                if (!isAdmin && assign.driver !== currentUser) return;
+
+                const [_, m, d] = key.split('-');
+                const displayDate = `${d}.${m}.${year}`;
+                const hrs = parseFloat(assign.hours || 0);
+                const tr = document.createElement('tr');
+                
+                const protocol = assign.bearbeitet_von ? `<span class="protocol-tag">[Von: ${assign.bearbeitet_von}]</span>` : "";
+
+                if (assign.status === 'planned') {
+                    countPlanned++;
+                    tr.innerHTML = `
+                        <td>${displayDate}</td>
+                        <td><strong>${assign.driver}</strong></td>
+                        <td><span style="color: var(--accent-color);">${assign.tour}</span></td>
+                        <td>${hrs.toFixed(2).replace('.', ',')} Std.</td>
+                        <td class="admin-only">
+                            <button class="btn-action btn-complete" onclick="markPlannedAsWorked('${key}', ${index})">Erledigt</button>
+                            <button class="btn-action btn-delete" onclick="deleteAssignment('${key}', ${index})">Löschen</button>
+                        </td>
+                    `;
+                    plannedListBody.appendChild(tr);
+                } else if (assign.status === 'worked') {
+                    countWorked++;
+                    tr.innerHTML = `
+                        <td>${displayDate}</td>
+                        <td><strong>${assign.driver}</strong></td>
+                        <td><span style="color: var(--success-color);">${assign.tour}</span></td>
+                        <td>${hrs.toFixed(2).replace('.', ',')} Std.${protocol}</td>
+                        <td class="admin-only">
+                            <button class="btn-action btn-delete" onclick="deleteAssignment('${key}', ${index})">Löschen</button>
+                        </td>
+                    `;
+                    workedListBody.appendChild(tr);
+                }
+            });
+        });
+
+        const colSpan = isAdmin ? 5 : 4;
+        if (countPlanned === 0) plannedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine geplanten Touren.</td></tr>`;
+        if (countWorked === 0) workedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine erledigten Fahrten.</td></tr>`;
+
+        countPlannedEl.textContent = countPlanned;
+        countWorkedEl.textContent = countWorked;
+    }
+
+    function openModal(dateStr, day, monthName) {
+        if (!isAdmin) return;
+        selectedDateStr = dateStr;
+        modalDateLabel.textContent = `${day}. ${monthName} 2026`;
+        updateModalActiveDrivers();
+        decisionGroup.style.display = 'flex';
+        addDriverGroup.style.display = 'none';
+        actionModal.style.display = 'flex';
+    }
+
+    function updateModalActiveDrivers() {
+        modalActiveDriversList.innerHTML = '';
+        let assignments = data[selectedDateStr] || [];
+        if (!Array.isArray(assignments)) assignments = [];
+
+        if (assignments.length === 0) {
+            modalActiveDriversList.innerHTML = `<div style="padding:10px; text-align:center; color:var(--text-muted); font-style:italic;">Keine Einträge.</div>`;
+            return;
+        }
+
+        assignments.forEach((assign, idx) => {
+            const item = document.createElement('div');
+            item.className = 'modal-driver-item';
+            const statusLabel = assign.status === 'worked' ? '🟢 Erledigt' : '🟡 Geplant';
+            item.innerHTML = `
+                <div><strong>${assign.driver}</strong> - ${assign.tour} <br><small style="color:var(--text-muted)">${statusLabel} (${assign.hours}h)</small></div>
+                <button class="btn btn-danger" style="width:auto; padding:4px 8px; font-size:0.75rem;" onclick="deleteAssignment('${selectedDateStr}', ${idx})">X</button>
+            `;
+            modalActiveDriversList.appendChild(item);
+        });
+    }
+
+    function closeModal() { actionModal.style.display = 'none'; }
+    function showAddDriverForm() { decisionGroup.style.display = 'none'; addDriverGroup.style.display = 'block'; document.getElementById('modalHoursInput').value = ""; }
+    function backToDecision() { addDriverGroup.style.display = 'none'; decisionGroup.style.display = 'flex'; }
+    
+    function toggleHoursInputLimit() {
+        document.getElementById('modalHoursInput').min = document.getElementById('modalStatusSelect').value === 'planned' ? "0" : "0.1";
+    }
+
+    function saveDriverAssignment() {
+        const driver = modalDriverSelect.value;
+        const tour = document.getElementById('modalTourSelect').value;
+        const status = document.getElementById('modalStatusSelect').value;
+        const hours = parseFloat(modalHoursInput.value);
+
+        if (isNaN(hours) || hours < 0) { return alert("Gültige Stunden eingeben!"); }
+        if (!data[selectedDateStr]) data[selectedDateStr] = [];
+
+        const alreadyAssignedIdx = data[selectedDateStr].findIndex(a => a.driver === driver);
+        const newAssignment = { driver, tour, status, hours, bearbeitet_von: currentUser };
+
+        if (alreadyAssignedIdx > -1) {
+            if (confirm(`${driver} ist bereits eingeteilt. Überschreiben?`)) {
+                data[selectedDateStr][alreadyAssignedIdx] = newAssignment;
+            } else { return; }
+        } else {
+            data[selectedDateStr].push(newAssignment);
+        }
+
+        saveDataToSheet();
+        closeModal();
+    }
+
+    function markPlannedAsWorked(key, index) {
+        if (!isAdmin) return;
+        const hoursStr = prompt("Tatsächliche Stunden eingeben:", data[key][index].hours);
+        const hours = parseFloat(hoursStr);
+        if (!isNaN(hours) && hours > 0) {
+            data[key][index].status = 'worked';
+            data[key][index].hours = hours;
+            data[key][index].bearbeitet_von = currentUser; // Logge welcher Admin abgeschlossen hat
+            saveDataToSheet();
+        }
+    }
+
+    function deleteAssignment(key, index) {
+        if (!isAdmin) return;
+        if (confirm("Eintrag wirklich löschen?")) {
+            data[key].splice(index, 1);
+            if (data[key].length === 0) delete data[key];
+            saveDataToSheet();
+            closeModal();
+        }
+    }
+
+    function showLoading(show, message = "") {
+        loadingOverlay.textContent = message;
+        loadingOverlay.style.display = show ? 'flex' : 'none';
+    }
+
+    window.onclick = function(e) { if (e.target == actionModal) closeModal(); }
+</script>
 </body>
 </html>
