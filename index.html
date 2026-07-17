@@ -581,7 +581,6 @@
             <span class="form-label">Fahrer auswählen:</span>
             <select id="modalDriverSelect" class="modal-select" onchange="updateLiveHoursDisplay()"></select>
             
-            <!-- Live-Stundenzähler im Planungs-Fenster -->
             <div id="liveHoursContainer" class="live-hours-info">Aktuelle Monatsstunden: 0,00 Std.</div>
 
             <span class="form-label">Tour auswählen:</span>
@@ -630,11 +629,10 @@
 
     let currentUser = null;
     let isAdmin = false;
-    let sessionAdminVerified = false;
 
     let activeSelectedDateStr = ""; 
     let data = {}; 
-    let currentCalculatedDriverHours = {}; // Hält die aktuellen Monatsstunden der Fahrer für das Live-Modal bereit
+    let currentCalculatedDriverHours = {}; 
 
     const months = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
@@ -714,7 +712,6 @@
             if (isAdmin) {
                 const pin = prompt(`Willkommen zurück, ${currentUser}. Bitte Admin-PIN eingeben:`);
                 if (pin === ADMIN_PIN) {
-                    sessionAdminVerified = true;
                     showApp();
                 } else {
                     alert("Falsche PIN!");
@@ -736,7 +733,6 @@
             if (pin === ADMIN_PIN) {
                 currentUser = selected;
                 isAdmin = true;
-                sessionAdminVerified = true;
                 localStorage.setItem('ek_logged_user', currentUser);
                 showApp();
             } else {
@@ -753,7 +749,6 @@
     function handleLogout() {
         currentUser = null;
         isAdmin = false;
-        sessionAdminVerified = false;
         localStorage.removeItem('ek_logged_user');
         document.body.classList.remove('admin-mode');
         document.getElementById('main-app').classList.add('hidden');
@@ -877,29 +872,14 @@
 
             dayDiv.appendChild(driverListDiv);
 
-            // EINFACHER KLICK wechselt Tag, DOPPELKLICK öffnet das Admin-Modal
-            dayDiv.onclick = (e) => {
+            // KLICK steuert die Anzeige UND öffnet als Admin direkt die Planung
+            dayDiv.onclick = () => {
                 activeSelectedDateStr = dateStr;
                 render();
-            };
-
-            dayDiv.ondblclick = () => {
-                if (isAdmin) openModal(dateStr, day, months[month]);
-            };
-
-            // Für mobile Geräte (Simulierter Doppelklick)
-            let lastTap = 0;
-            dayDiv.addEventListener('touchend', function(e) {
-                const currentTime = new Date().getTime();
-                const tapLength = currentTime - lastTap;
-                activeSelectedDateStr = dateStr;
-                render();
-                if (tapLength < 300 && tapLength > 0) {
-                    if (isAdmin) openModal(dateStr, day, months[month]);
-                    e.preventDefault();
+                if (isAdmin) {
+                    openModal(dateStr, day, months[month]);
                 }
-                lastTap = currentTime;
-            });
+            };
 
             calendar.appendChild(dayDiv);
         }
@@ -948,7 +928,6 @@
         const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
         const keys = Object.keys(data).filter(key => key.startsWith(prefix));
         
-        // Reset globaler Stunden-Speicher für Live-Abfrage
         currentCalculatedDriverHours = {};
         FAHRER_LISTE.forEach(f => { currentCalculatedDriverHours[f] = 0.0; });
 
@@ -965,7 +944,6 @@
 
             assignments.forEach((assign, index) => {
                 if (assign.status === 'worked') {
-                    // Für Live-Modal im Hintergrund mitspeichern
                     if (currentCalculatedDriverHours[assign.driver] !== undefined) {
                         currentCalculatedDriverHours[assign.driver] += parseFloat(assign.hours || 0);
                     }
@@ -1034,8 +1012,7 @@
     }
 
     function openModal(dateStr, day, monthName) {
-        if (!isAdmin) return;
-        activeSelectedDateStr = dateStr; // Setzt den globalen aktiven Tag fest
+        activeSelectedDateStr = dateStr; 
         modalDateLabel.textContent = `${day}. ${monthName} 2026`;
         updateModalActiveDrivers();
         decisionGroup.style.display = 'flex';
@@ -1067,7 +1044,6 @@
         });
     }
 
-    // Zeigt die Stunden des ausgewählten Fahrers im Planungs-Dropdown live an
     function updateLiveHoursDisplay() {
         const selectedDriver = modalDriverSelect.value;
         const currentHours = currentCalculatedDriverHours[selectedDriver] || 0.0;
@@ -1082,7 +1058,7 @@
         modalStatusSelect.value = "planned";
         modalHoursInput.value = "0"; 
         modalHoursInput.min = "0";
-        updateLiveHoursDisplay(); // Direkt beim Öffnen laden
+        updateLiveHoursDisplay(); 
     }
     
     function backToDecision() { addDriverGroup.style.display = 'none'; decisionGroup.style.display = 'flex'; }
