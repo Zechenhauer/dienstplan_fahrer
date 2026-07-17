@@ -42,7 +42,6 @@
             position: relative;
         }
 
-        /* Lade-Anzeige */
         .loading-overlay {
             display: none;
             position: absolute;
@@ -102,7 +101,6 @@
             background: var(--danger-color);
         }
 
-        /* --- LOGIN SCREEN OVERLAY --- */
         #login-screen {
             position: fixed;
             top: 0;
@@ -185,7 +183,6 @@
             display: block;
         }
 
-        /* --- KALENDER-GRID --- */
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -266,7 +263,6 @@
             background: rgba(255, 152, 0, 0.15);
         }
 
-        /* --- ARBEITSLISTEN --- */
         .work-list {
             margin-top: 20px;
         }
@@ -350,7 +346,6 @@
         .btn-complete { color: var(--success-color); }
         .btn-complete:hover { text-decoration: underline; }
 
-        /* --- MODAL --- */
         .modal {
             display: none;
             position: fixed;
@@ -437,7 +432,6 @@
 </head>
 <body>
 
-<!-- LOGIN OVERLAY SCREEN -->
 <div id="login-screen" class="hidden">
     <div class="login-box">
         <h2>Eisen Krämer Login</h2>
@@ -457,7 +451,6 @@
     </div>
 </div>
 
-<!-- HAUPT APP WRAPPER -->
 <div class="container hidden" id="main-app">
     <div class="loading-overlay" id="loadingOverlay">Daten werden geladen...</div>
 
@@ -479,7 +472,6 @@
         </div>
     </div>
 
-    <!-- DAS SCHÖNE KALENDER-GRID -->
     <div class="calendar-grid" id="calendar">
         <div class="weekday">Mo</div>
         <div class="weekday">Di</div>
@@ -490,7 +482,6 @@
         <div class="weekday">So</div>
     </div>
 
-    <!-- TABELLE 1: GEPLANTE TOUREN -->
     <div class="work-list">
         <div class="list-title title-planned">
             <span id="planned-list-title">Geplante Touren</span>
@@ -512,7 +503,6 @@
         </div>
     </div>
 
-    <!-- TABELLE 2: ABSOLVIERTE TOUREN -->
     <div class="work-list">
         <div class="list-title title-worked">
             <span id="worked-list-title">Absolvierte Fahrten (Erledigt)</span>
@@ -535,7 +525,6 @@
     </div>
 </div>
 
-<!-- TEAM-VERWALTUNGS-MODAL (NUR ADMINS) -->
 <div class="modal" id="actionModal">
     <div class="modal-content">
         <h3 id="modalDateLabel">Tag verwalten</h3>
@@ -579,11 +568,11 @@
 </div>
 
 <script>
-    // DEINE NEUE WEB-APP-URL AUS SCHRITT 3
     const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbw78NXPd0ygZeskt9A1cua_IZCWWo1Y2GY9JPR0vUpBNVO_DOZuY2XvCjl5dZYN639amA/exec";
     const ADMIN_PIN = "1919";
 
     const ADMINS = ["Jürgen", "Dirk", "Michael", "Thorsten"];
+    // DEINE AKTUALISIERTE FAHRERLISTE
     const FAHRER_LISTE = ["Jürgen", "Detlef", "Hans-Peter", "Fahrer 4", "Fahrer 5", "Fahrer 6", "Fahrer 7", "Fahrer 8"];
 
     let currentUser = null;
@@ -618,27 +607,28 @@
     };
 
     function setupDropdowns() {
-        // Befülle Login-Dropdown
         const fahrerGroup = document.getElementById('fahrer-optgroup');
         fahrerGroup.innerHTML = "";
         FAHRER_LISTE.forEach(f => {
             fahrerGroup.innerHTML += `<option value="${f}">${f}</option>`;
         });
 
-        // Befülle Modal-Dropdown (für Admin-Zuweisung)
+        // OPTIMIERUNG: Beim Zuweisen einer Tour stehen hier NUR die Fahrer aus FAHRER_LISTE (Admins ohne Fahrfunktion blenden wir aus)
         modalDriverSelect.innerHTML = "";
-        [...ADMINS, ...FAHRER_LISTE].forEach(p => {
+        FAHRER_LISTE.forEach(p => {
             modalDriverSelect.innerHTML += `<option value="${p}">${p}</option>`;
         });
 
-        // Befülle Monate & Jahre
         months.forEach((m, idx) => {
             const opt = document.createElement('option');
             opt.value = idx;
             opt.textContent = m;
             monthSelect.appendChild(opt);
         });
-        monthSelect.value = 6; // Juli standardmäßig
+        
+        // Aktuellen Monat/Jahr ermitteln
+        const heute = new Date();
+        monthSelect.value = heute.getMonth(); 
 
         for (let y = 2025; y <= 2028; y++) {
             const opt = document.createElement('option');
@@ -646,7 +636,7 @@
             opt.textContent = y;
             yearSelect.appendChild(opt);
         }
-        yearSelect.value = 2026;
+        yearSelect.value = heute.getFullYear();
 
         monthSelect.addEventListener('change', render);
         yearSelect.addEventListener('change', render);
@@ -713,11 +703,11 @@
         
         if (isAdmin) {
             document.body.classList.add('admin-mode');
-            document.getElementById('planned-list-title').innerText = "Geplante Touren (Teamübersicht)";
+            document.getElementById('planned-list-title').innerText = "Anstehende Touren (Teamübersicht)";
             document.getElementById('worked-list-title').innerText = "Absolvierte Fahrten (Teamübersicht)";
         } else {
             document.body.classList.remove('admin-mode');
-            document.getElementById('planned-list-title').innerText = `Meine geplanten Touren`;
+            document.getElementById('planned-list-title').innerText = `Meine anstehenden Touren`;
             document.getElementById('worked-list-title').innerText = `Meine absolvierten Fahrten`;
         }
         
@@ -795,7 +785,6 @@
             if (dayAssignments && !Array.isArray(dayAssignments)) dayAssignments = [];
 
             dayAssignments.forEach(assign => {
-                // Ein Fahrer sieht im Kalender auch nur seine eigenen bunten Badges
                 if (isAdmin || assign.driver === currentUser) {
                     const badge = document.createElement('div');
                     badge.className = `day-driver-badge ${assign.status}`;
@@ -820,14 +809,20 @@
         let countWorked = 0;
         const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
 
+        // Heutiges Datum zum Vergleichen (Uhrzeit wegschneiden)
+        const heute = new Date();
+        heute.setHours(0,0,0,0);
+
         const sortedKeys = Object.keys(data).filter(key => key.startsWith(prefix)).sort();
 
         sortedKeys.forEach(key => {
             let assignments = data[key] || [];
             if (assignments && !Array.isArray(assignments)) assignments = [];
 
+            const tourDatum = new Date(key);
+            tourDatum.setHours(0,0,0,0);
+
             assignments.forEach((assign, index) => {
-                // Filtern: Fahrer sehen nur sich selbst
                 if (!isAdmin && assign.driver !== currentUser) return;
 
                 const [_, m, d] = key.split('-');
@@ -838,6 +833,9 @@
                 const protocol = assign.bearbeitet_von ? `<span class="protocol-tag">[Von: ${assign.bearbeitet_von}]</span>` : "";
 
                 if (assign.status === 'planned') {
+                    // OPTIMIERUNG: Liegt das Datum der geplanten Tour in der Vergangenheit, wird sie hier nicht mehr aufgeführt
+                    if (tourDatum < heute) return;
+
                     countPlanned++;
                     tr.innerHTML = `
                         <td>${displayDate}</td>
@@ -867,7 +865,7 @@
         });
 
         const colSpan = isAdmin ? 5 : 4;
-        if (countPlanned === 0) plannedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine geplanten Touren.</td></tr>`;
+        if (countPlanned === 0) plannedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine anstehenden geplanten Touren.</td></tr>`;
         if (countWorked === 0) workedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine erledigten Fahrten.</td></tr>`;
 
         countPlannedEl.textContent = countPlanned;
@@ -945,7 +943,7 @@
         if (!isNaN(hours) && hours > 0) {
             data[key][index].status = 'worked';
             data[key][index].hours = hours;
-            data[key][index].bearbeitet_von = currentUser; // Logge welcher Admin abgeschlossen hat
+            data[key][index].bearbeitet_von = currentUser; 
             saveDataToSheet();
         }
     }
