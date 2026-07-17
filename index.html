@@ -367,7 +367,6 @@
         .btn-complete { color: var(--success-color); }
         .btn-complete:hover { text-decoration: underline; }
 
-        /* Stil für die verschachtelte Detail-Tourliste */
         .sub-details-table {
             background: #161616;
             width: 100%;
@@ -436,6 +435,15 @@
             font-size: 0.95rem;
             margin-bottom: 12px;
             width: 100%;
+        }
+
+        .live-hours-info {
+            font-size: 0.8rem;
+            color: var(--success-color);
+            margin-top: -8px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            padding-left: 2px;
         }
 
         .btn {
@@ -516,7 +524,6 @@
         <div class="weekday">So</div>
     </div>
 
-    <!-- 1. TABELLE: GEPLANTER TAG (NUR NOCH AKTUELLER TAG) -->
     <div class="work-list">
         <div class="list-title title-planned">
             <span id="planned-list-title">Geplante Touren am Tag</span>
@@ -538,7 +545,6 @@
         </div>
     </div>
 
-    <!-- 2. TABELLE: ZUORDNUNG GELEISTETE STUNDEN PRO FAHRER -->
     <div class="work-list">
         <div class="list-title title-worked">
             <span id="worked-list-title">Geleistete Stunden (Monatsübersicht)</span>
@@ -573,7 +579,10 @@
 
         <div id="addDriverGroup" class="input-group">
             <span class="form-label">Fahrer auswählen:</span>
-            <select id="modalDriverSelect" class="modal-select"></select>
+            <select id="modalDriverSelect" class="modal-select" onchange="updateLiveHoursDisplay()"></select>
+            
+            <!-- Live-Stundenzähler im Planungs-Fenster -->
+            <div id="liveHoursContainer" class="live-hours-info">Aktuelle Monatsstunden: 0,00 Std.</div>
 
             <span class="form-label">Tour auswählen:</span>
             <select id="modalTourSelect" class="modal-select">
@@ -623,9 +632,9 @@
     let isAdmin = false;
     let sessionAdminVerified = false;
 
-    // Speichert den aktuell ausgewählten Tag (Standard: Heute)
     let activeSelectedDateStr = ""; 
     let data = {}; 
+    let currentCalculatedDriverHours = {}; // Hält die aktuellen Monatsstunden der Fahrer für das Live-Modal bereit
 
     const months = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
@@ -644,10 +653,10 @@
     const decisionGroup = document.getElementById('decisionGroup');
     const addDriverGroup = document.getElementById('addDriverGroup');
     const modalDriverSelect = document.getElementById('modalDriverSelect');
+    const liveHoursContainer = document.getElementById('liveHoursContainer');
     const modalHoursInput = document.getElementById('modalHoursInput');
     const modalStatusSelect = document.getElementById('modalStatusSelect');
 
-    // Zustand für ein- und ausgeblendete Detail-Touren in der Fahrerliste
     let openDriverDetails = {};
 
     window.onload = function() {
@@ -868,14 +877,29 @@
 
             dayDiv.appendChild(driverListDiv);
 
-            // Klick wechselt den aktiven Tag für die Listen-Steuerung
-            dayDiv.onclick = () => {
+            // EINFACHER KLICK wechselt Tag, DOPPELKLICK öffnet das Admin-Modal
+            dayDiv.onclick = (e) => {
                 activeSelectedDateStr = dateStr;
                 render();
-                if (isAdmin && window.event.detail > 1) { // Doppelklick öffnet das Admin-Modal
-                    openModal(dateStr, day, months[month]);
-                }
             };
+
+            dayDiv.ondblclick = () => {
+                if (isAdmin) openModal(dateStr, day, months[month]);
+            };
+
+            // Für mobile Geräte (Simulierter Doppelklick)
+            let lastTap = 0;
+            dayDiv.addEventListener('touchend', function(e) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                activeSelectedDateStr = dateStr;
+                render();
+                if (tapLength < 300 && tapLength > 0) {
+                    if (isAdmin) openModal(dateStr, day, months[month]);
+                    e.preventDefault();
+                }
+                lastTap = currentTime;
+            });
 
             calendar.appendChild(dayDiv);
         }
@@ -893,7 +917,6 @@
         let countPlanned = 0;
         let totalHoursAllDrivers = 0.0;
         
-        // --- 1. SCHLEIFE: GEPLANTER TAG (NUR DER AKTIV GEWÄHLTE TAG) ---
         const [selY, selM, selD] = activeSelectedDateStr.split('-');
         document.getElementById('planned-list-title').innerText = `Geplante Touren am ${selD}.${selM}.${selY}`;
 
@@ -922,14 +945,14 @@
             }
         });
 
-        // --- 2. SCHLEIFE: GELEISTETE STUNDEN PRO FAHRER (MONATS-POOL) ---
         const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
         const keys = Object.keys(data).filter(key => key.startsWith(prefix));
         
-        // Struktur zum Sammeln der Stunden pro Fahrer
-        let fahrerStundenPool = {};
+        // Reset globaler Stunden-Speicher für Live-Abfrage
+        currentCalculatedDriverHours = {};
+        FAHRER_LISTE.forEach(f => { currentCalculatedDriverHours[f] = 0.0; });
 
-        // Vorbefüllen, damit jeder sichtbare Fahrer auftaucht
+        let fahrerStundenPool = {};
         FAHRER_LISTE.forEach(f => {
             if (isAdmin || f === currentUser) {
                 fahrerStundenPool[f] = { total: 0.0, touren: [] };
@@ -942,6 +965,10 @@
 
             assignments.forEach((assign, index) => {
                 if (assign.status === 'worked') {
+                    // Für Live-Modal im Hintergrund mitspeichern
+                    if (currentCalculatedDriverHours[assign.driver] !== undefined) {
+                        currentCalculatedDriverHours[assign.driver] += parseFloat(assign.hours || 0);
+                    }
                     if (fahrerStundenPool[assign.driver]) {
                         const hrs = parseFloat(assign.hours || 0);
                         fahrerStundenPool[assign.driver].total += hrs;
@@ -956,7 +983,6 @@
             });
         });
 
-        // Fahrer-Stunden-Liste rendern
         Object.keys(fahrerStundenPool).forEach(driver => {
             const pool = fahrerStundenPool[driver];
             totalHoursAllDrivers += pool.total;
@@ -965,7 +991,6 @@
             const punktFarbe = FAHRER_FARBEN[driver] || "#e0e0e0";
             const detailIcon = openDriverDetails[driver] ? '▼' : '👁️';
 
-            // Generiere Untertabelle für die Detail-Touren falls ausgeklappt
             let detailsHtml = "";
             if (openDriverDetails[driver] && pool.touren.length > 0) {
                 detailsHtml = `<tr><td colspan="3"><table class="sub-details-table">`;
@@ -1001,7 +1026,6 @@
             }
         });
 
-        // Fallbacks
         const colSpan = isAdmin ? 5 : 4;
         if (countPlanned === 0) plannedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine geplanten Touren an diesem Tag. (Kalender anklicken zum Wechseln)</td></tr>`;
 
@@ -1011,7 +1035,7 @@
 
     function openModal(dateStr, day, monthName) {
         if (!isAdmin) return;
-        selectedDateStr = dateStr;
+        activeSelectedDateStr = dateStr; // Setzt den globalen aktiven Tag fest
         modalDateLabel.textContent = `${day}. ${monthName} 2026`;
         updateModalActiveDrivers();
         decisionGroup.style.display = 'flex';
@@ -1021,7 +1045,7 @@
 
     function updateModalActiveDrivers() {
         modalActiveDriversList.innerHTML = '';
-        let assignments = data[selectedDateStr] || [];
+        let assignments = data[activeSelectedDateStr] || [];
         if (!Array.isArray(assignments)) assignments = [];
 
         if (assignments.length === 0) {
@@ -1037,10 +1061,17 @@
             const statusLabel = assign.status === 'worked' ? '🟢 Erledigt' : '🟡 Geplant';
             item.innerHTML = `
                 <div><strong>${assign.driver}</strong> - ${assign.tour} <br><small style="color:var(--text-muted)">${statusLabel} (${assign.hours}h)</small></div>
-                <button class="btn btn-danger" style="width:auto; padding:4px 8px; font-size:0.75rem;" onclick="deleteAssignment('${selectedDateStr}', ${idx})">X</button>
+                <button class="btn btn-danger" style="width:auto; padding:4px 8px; font-size:0.75rem;" onclick="deleteAssignment('${activeSelectedDateStr}', ${idx})">X</button>
             `;
             modalActiveDriversList.appendChild(item);
         });
+    }
+
+    // Zeigt die Stunden des ausgewählten Fahrers im Planungs-Dropdown live an
+    function updateLiveHoursDisplay() {
+        const selectedDriver = modalDriverSelect.value;
+        const currentHours = currentCalculatedDriverHours[selectedDriver] || 0.0;
+        liveHoursContainer.innerText = `Aktuelle Monatsstunden von ${selectedDriver}: ${currentHours.toFixed(2).replace('.', ',')} Std.`;
     }
 
     function closeModal() { actionModal.style.display = 'none'; }
@@ -1051,6 +1082,7 @@
         modalStatusSelect.value = "planned";
         modalHoursInput.value = "0"; 
         modalHoursInput.min = "0";
+        updateLiveHoursDisplay(); // Direkt beim Öffnen laden
     }
     
     function backToDecision() { addDriverGroup.style.display = 'none'; decisionGroup.style.display = 'flex'; }
@@ -1072,17 +1104,17 @@
         const hours = parseFloat(modalHoursInput.value);
 
         if (isNaN(hours) || hours < 0) { return alert("Gültige Stunden eingeben!"); }
-        if (!data[selectedDateStr]) data[selectedDateStr] = [];
+        if (!data[activeSelectedDateStr]) data[activeSelectedDateStr] = [];
 
-        const alreadyAssignedIdx = data[selectedDateStr].findIndex(a => a.driver === driver);
+        const alreadyAssignedIdx = data[activeSelectedDateStr].findIndex(a => a.driver === driver);
         const newAssignment = { driver, tour, status, hours, bearbeitet_von: currentUser };
 
         if (alreadyAssignedIdx > -1) {
             if (confirm(`${driver} ist bereits eingeteilt. Überschreiben?`)) {
-                data[selectedDateStr][alreadyAssignedIdx] = newAssignment;
+                data[activeSelectedDateStr][alreadyAssignedIdx] = newAssignment;
             } else { return; }
         } else {
-            data[selectedDateStr].push(newAssignment);
+            data[activeSelectedDateStr].push(newAssignment);
         }
 
         saveDataToSheet();
