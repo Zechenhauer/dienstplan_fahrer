@@ -253,14 +253,17 @@
             line-height: 1.1;
         }
 
+        /* LIVE-FARBEN IM KALENDER */
         .day-driver-badge.worked {
-            border-left: 3.5px solid var(--success-color);
-            background: rgba(76, 175, 80, 0.15);
+            background: var(--success-color); /* Komplett Grün bei erledigt */
+            color: #000;
+            font-weight: bold;
         }
 
         .day-driver-badge.planned {
-            border-left: 3.5px solid var(--accent-color);
-            background: rgba(255, 152, 0, 0.15);
+            background: var(--accent-color); /* Komplett Orange bei geplant */
+            color: #000;
+            font-weight: bold;
         }
 
         .work-list {
@@ -277,7 +280,6 @@
         }
 
         .title-planned { border-left: 3px solid var(--accent-color); }
-        .title-worked { border-left: 3px solid var(--success-color); }
 
         .count-badge {
             font-size: 0.75rem;
@@ -319,14 +321,6 @@
             color: var(--text-muted);
             padding: 12px;
             font-style: italic;
-        }
-
-        .protocol-tag {
-            font-style: italic;
-            color: var(--admin-badge);
-            font-size: 0.72rem;
-            display: block;
-            margin-top: 2px;
         }
 
         .admin-only { display: none; }
@@ -444,7 +438,6 @@
                 <option value="Thorsten">Thorsten</option>
             </optgroup>
             <optgroup label="Fahrer" id="fahrer-optgroup">
-                <!-- Wird dynamisch befüllt -->
             </optgroup>
         </select>
         <button onclick="handleLogin()" class="login-btn">Anmelden & Speichern</button>
@@ -502,27 +495,6 @@
             </table>
         </div>
     </div>
-
-    <div class="work-list">
-        <div class="list-title title-worked">
-            <span id="worked-list-title">Absolvierte Fahrten (Erledigt)</span>
-            <span class="count-badge" id="countWorked">0</span>
-        </div>
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Datum</th>
-                        <th>Fahrer</th>
-                        <th>Tour</th>
-                        <th>Geleistete Std.</th>
-                        <th class="admin-only">Aktion</th>
-                    </tr>
-                </thead>
-                <tbody id="workedListBody"></tbody>
-            </table>
-        </div>
-    </div>
 </div>
 
 <div class="modal" id="actionModal">
@@ -572,7 +544,6 @@
     const ADMIN_PIN = "1919";
 
     const ADMINS = ["Jürgen", "Dirk", "Michael", "Thorsten"];
-    // DEINE AKTUALISIERTE FAHRERLISTE
     const FAHRER_LISTE = ["Jürgen", "Detlef", "Hans-Peter", "Fahrer 4", "Fahrer 5", "Fahrer 6", "Fahrer 7", "Fahrer 8"];
 
     let currentUser = null;
@@ -588,9 +559,7 @@
     const yearSelect = document.getElementById('yearSelect');
     const calendar = document.getElementById('calendar');
     const plannedListBody = document.getElementById('plannedListBody');
-    const workedListBody = document.getElementById('workedListBody');
     const countPlannedEl = document.getElementById('countPlanned');
-    const countWorkedEl = document.getElementById('countWorked');
     const loadingOverlay = document.getElementById('loadingOverlay');
     
     const actionModal = document.getElementById('actionModal');
@@ -613,7 +582,6 @@
             fahrerGroup.innerHTML += `<option value="${f}">${f}</option>`;
         });
 
-        // OPTIMIERUNG: Beim Zuweisen einer Tour stehen hier NUR die Fahrer aus FAHRER_LISTE (Admins ohne Fahrfunktion blenden wir aus)
         modalDriverSelect.innerHTML = "";
         FAHRER_LISTE.forEach(p => {
             modalDriverSelect.innerHTML += `<option value="${p}">${p}</option>`;
@@ -626,7 +594,6 @@
             monthSelect.appendChild(opt);
         });
         
-        // Aktuellen Monat/Jahr ermitteln
         const heute = new Date();
         monthSelect.value = heute.getMonth(); 
 
@@ -704,11 +671,9 @@
         if (isAdmin) {
             document.body.classList.add('admin-mode');
             document.getElementById('planned-list-title').innerText = "Anstehende Touren (Teamübersicht)";
-            document.getElementById('worked-list-title').innerText = "Absolvierte Fahrten (Teamübersicht)";
         } else {
             document.body.classList.remove('admin-mode');
             document.getElementById('planned-list-title').innerText = `Meine anstehenden Touren`;
-            document.getElementById('worked-list-title').innerText = `Meine absolvierten Fahrten`;
         }
         
         loadDataFromSheet();
@@ -784,6 +749,9 @@
             let dayAssignments = data[dateStr] || [];
             if (dayAssignments && !Array.isArray(dayAssignments)) dayAssignments = [];
 
+            // Sortierung im Kalender nach Namen
+            dayAssignments.sort((a, b) => a.driver.localeCompare(b.driver));
+
             dayAssignments.forEach(assign => {
                 if (isAdmin || assign.driver === currentUser) {
                     const badge = document.createElement('div');
@@ -804,18 +772,18 @@
 
     function renderLists(year, month) {
         plannedListBody.innerHTML = '';
-        workedListBody.innerHTML = '';
         let countPlanned = 0;
-        let countWorked = 0;
         const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-        // Heutiges Datum zum Vergleichen (Uhrzeit wegschneiden)
         const heute = new Date();
         heute.setHours(0,0,0,0);
 
-        const sortedKeys = Object.keys(data).filter(key => key.startsWith(prefix)).sort();
+        const keys = Object.keys(data).filter(key => key.startsWith(prefix));
+        
+        // Alle geplanten Einträge für das Listen-Array sammeln
+        let allPlannedEntries = [];
 
-        sortedKeys.forEach(key => {
+        keys.forEach(key => {
             let assignments = data[key] || [];
             if (assignments && !Array.isArray(assignments)) assignments = [];
 
@@ -824,52 +792,47 @@
 
             assignments.forEach((assign, index) => {
                 if (!isAdmin && assign.driver !== currentUser) return;
-
-                const [_, m, d] = key.split('-');
-                const displayDate = `${d}.${m}.${year}`;
-                const hrs = parseFloat(assign.hours || 0);
-                const tr = document.createElement('tr');
                 
-                const protocol = assign.bearbeitet_von ? `<span class="protocol-tag">[Von: ${assign.bearbeitet_von}]</span>` : "";
-
-                if (assign.status === 'planned') {
-                    // OPTIMIERUNG: Liegt das Datum der geplanten Tour in der Vergangenheit, wird sie hier nicht mehr aufgeführt
-                    if (tourDatum < heute) return;
-
-                    countPlanned++;
-                    tr.innerHTML = `
-                        <td>${displayDate}</td>
-                        <td><strong>${assign.driver}</strong></td>
-                        <td><span style="color: var(--accent-color);">${assign.tour}</span></td>
-                        <td>${hrs.toFixed(2).replace('.', ',')} Std.</td>
-                        <td class="admin-only">
-                            <button class="btn-action btn-complete" onclick="markPlannedAsWorked('${key}', ${index})">Erledigt</button>
-                            <button class="btn-action btn-delete" onclick="deleteAssignment('${key}', ${index})">Löschen</button>
-                        </td>
-                    `;
-                    plannedListBody.appendChild(tr);
-                } else if (assign.status === 'worked') {
-                    countWorked++;
-                    tr.innerHTML = `
-                        <td>${displayDate}</td>
-                        <td><strong>${assign.driver}</strong></td>
-                        <td><span style="color: var(--success-color);">${assign.tour}</span></td>
-                        <td>${hrs.toFixed(2).replace('.', ',')} Std.${protocol}</td>
-                        <td class="admin-only">
-                            <button class="btn-action btn-delete" onclick="deleteAssignment('${key}', ${index})">Löschen</button>
-                        </td>
-                    `;
-                    workedListBody.appendChild(tr);
+                // Nur geplante Touren, die nicht in der Vergangenheit liegen
+                if (assign.status === 'planned' && tourDatum >= heute) {
+                    allPlannedEntries.push({
+                        key: key,
+                        index: index,
+                        driver: assign.driver,
+                        tour: assign.tour,
+                        hours: assign.hours
+                    });
                 }
             });
         });
 
+        // OPTIMIERUNG: Sortierung der Liste nach Fahrer-Namen (A-Z)
+        allPlannedEntries.sort((a, b) => a.driver.localeCompare(b.driver));
+
+        allPlannedEntries.forEach(item => {
+            countPlanned++;
+            const [y, m, d] = item.key.split('-');
+            const displayDate = `${d}.${m}.${y}`;
+            const hrs = parseFloat(item.hours || 0);
+            const tr = document.createElement('tr');
+
+            tr.innerHTML = `
+                <td>${displayDate}</td>
+                <td><strong>${item.driver}</strong></td>
+                <td><span style="color: var(--accent-color);">${item.tour}</span></td>
+                <td>${hrs.toFixed(2).replace('.', ',')} Std.</td>
+                <td class="admin-only">
+                    <button class="btn-action btn-complete" onclick="markPlannedAsWorked('${item.key}', ${item.index})">Erledigt</button>
+                    <button class="btn-action btn-delete" onclick="deleteAssignment('${item.key}', ${item.index})">Löschen</button>
+                </td>
+            `;
+            plannedListBody.appendChild(tr);
+        });
+
         const colSpan = isAdmin ? 5 : 4;
         if (countPlanned === 0) plannedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine anstehenden geplanten Touren.</td></tr>`;
-        if (countWorked === 0) workedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine erledigten Fahrten.</td></tr>`;
 
         countPlannedEl.textContent = countPlanned;
-        countWorkedEl.textContent = countWorked;
     }
 
     function openModal(dateStr, day, monthName) {
@@ -891,6 +854,8 @@
             modalActiveDriversList.innerHTML = `<div style="padding:10px; text-align:center; color:var(--text-muted); font-style:italic;">Keine Einträge.</div>`;
             return;
         }
+
+        assignments.sort((a, b) => a.driver.localeCompare(b.driver));
 
         assignments.forEach((assign, idx) => {
             const item = document.createElement('div');
