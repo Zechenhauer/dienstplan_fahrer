@@ -547,7 +547,7 @@
 
     <div class="work-list">
         <div class="list-title title-worked">
-            <span id="worked-list-title">Geleistete Stunden (Monatsübersicht)</span>
+            <span id="worked-list-title">Geleistete Stunden & Soll-Abgleich</span>
             <span class="count-badge hours-total" id="totalHoursBadge" style="display: none;">0,00 Std. Gesamt</span>
         </div>
         <div class="table-responsive">
@@ -555,8 +555,10 @@
                 <thead>
                     <tr>
                         <th>Fahrer</th>
-                        <th>Geleistete Gesamtstunden</th>
-                        <th style="width: 80px; text-align: center;">Details</th>
+                        <th>Geleistet</th>
+                        <th>Übertrag</th>
+                        <th>Gesamtbilanz (Soll: 40h)</th>
+                        <th style="width: 60px; text-align: center;">Details</th>
                     </tr>
                 </thead>
                 <tbody id="workedListBody"></tbody>
@@ -612,6 +614,7 @@
 <script>
     const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbw78NXPd0ygZeskt9A1cua_IZCWWo1Y2GY9JPR0vUpBNVO_DOZuY2XvCjl5dZYN639amA/exec";
     const ADMIN_PIN = "1919";
+    const SOLL_STUNDEN = 40.0;
 
     const ADMINS = ["Jürgen", "Dirk", "Michael", "Thorsten"];
     const FAHRER_LISTE = ["Jürgen", "Detlef", "Hans-Peter", "Fahrer 4", "Fahrer 5", "Fahrer 6", "Fahrer 7", "Fahrer 8"];
@@ -762,10 +765,10 @@
         
         if (isAdmin) {
             document.body.classList.add('admin-mode');
-            document.getElementById('worked-list-title').innerText = "Geleistete Stunden & Historie (Teamübersicht)";
+            document.getElementById('worked-list-title').innerText = "Geleistete Stunden & Soll-Abgleich (Teamübersicht)";
         } else {
             document.body.classList.remove('admin-mode');
-            document.getElementById('worked-list-title').innerText = `Meine geleisteten Stunden (${months[parseInt(monthSelect.value)]})`;
+            document.getElementById('worked-list-title').innerText = `Meine Stundenbilanz (${months[parseInt(monthSelect.value)]})`;
         }
         
         loadDataFromSheet();
@@ -889,6 +892,22 @@
         render();
     }
 
+    function updateCarryover(year, month, driver) {
+        const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${driver}`;
+        const currentVal = data[mKey] !== undefined ? data[mKey] : 0.0;
+        const inputStr = prompt(`Übertrag (Plus- oder Minusstunden) für ${driver} im Monat ${months[month]} ${year} eingeben:\n(z.B. -5 für 5 Minusstunden oder 3.5 für Plus-Stunden)`, currentVal);
+        
+        if (inputStr !== null) {
+            const val = parseFloat(inputStr.replace(',', '.'));
+            if (!isNaN(val)) {
+                data[mKey] = val;
+                saveDataToSheet();
+            } else {
+                alert("Bitte eine gültige Zahl eingeben!");
+            }
+        }
+    }
+
     function renderLists(year, month) {
         plannedListBody.innerHTML = '';
         workedListBody.innerHTML = '';
@@ -925,7 +944,7 @@
         });
 
         const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-        const keys = Object.keys(data).filter(key => key.startsWith(prefix));
+        const keys = Object.keys(data).filter(key => key.startsWith(prefix) && !key.startsWith("carryover_"));
         
         currentCalculatedDriverHours = {};
         FAHRER_LISTE.forEach(f => { currentCalculatedDriverHours[f] = 0.0; });
@@ -933,7 +952,10 @@
         let fahrerStundenPool = {};
         FAHRER_LISTE.forEach(f => {
             if (isAdmin || f === currentUser) {
-                fahrerStundenPool[f] = { total: 0.0, touren: [] };
+                const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${f}`;
+                const carryoverVal = data[mKey] !== undefined ? parseFloat(data[mKey]) : 0.0;
+
+                fahrerStundenPool[f] = { total: 0.0, carryover: carryoverVal, touren: [] };
             }
         });
 
@@ -965,36 +987,54 @@
             const pool = fahrerStundenPool[driver];
             totalHoursAllDrivers += pool.total;
 
+            // Berechnung: (Geleistete Std + Übertrag) - Soll (40h)
+            const bilanz = (pool.total + pool.carryover) - SOLL_STUNDEN;
+            const bilanzColor = bilanz >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+            const bilanzSign = bilanz > 0 ? '+' : '';
+
             const tr = document.createElement('tr');
             const punktFarbe = FAHRER_FARBEN[driver] || "#e0e0e0";
             const detailIcon = openDriverDetails[driver] ? '▼' : '👁️';
 
             let detailsHtml = "";
-            if (openDriverDetails[driver] && pool.touren.length > 0) {
-                detailsHtml = `<tr><td colspan="3"><table class="sub-details-table">`;
-                pool.touren.sort((a,b) => b.key.localeCompare(a.key)).forEach(t => {
-                    const [ty, tm, td] = t.key.split('-');
-                    
-                    // Zeigt den Bearbeiter NUR den Admins in den Tour-Details an
-                    const editorInfo = isAdmin ? `<span style="color:var(--text-muted); font-size:0.75rem; font-style:italic; margin-left:10px;">(geändert von: ${t.editor})</span>` : '';
-                    
-                    detailsHtml += `
-                        <tr>
-                            <td style="color:var(--text-muted)">${td}.${tm}.${ty}</td>
-                            <td style="color:#64b5f6">${t.tour} ${editorInfo}</td>
-                            <td style="text-align:right; font-weight:bold; color:var(--success-color)">${t.hours.toFixed(2).replace('.', ',')} Std.</td>
-                            ${isAdmin ? `<td style="text-align:right; width:90px;">
-                                <span style="cursor:pointer; color:var(--text-muted); margin-right:8px;" onclick="revertToPlanned('${t.key}', ${t.index})">Reset</span>
-                                <span style="cursor:pointer; color:var(--danger-color);" onclick="deleteAssignment('${t.key}', ${t.index})">X</span>
-                            </td>` : ''}
-                        </tr>`;
-                });
+            if (openDriverDetails[driver]) {
+                detailsHtml = `<tr><td colspan="5"><table class="sub-details-table">`;
+                
+                if (isAdmin) {
+                    detailsHtml += `<tr><td colspan="4" style="background:#202020; padding:8px;">
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding:6px; width:auto;" onclick="updateCarryover(${year}, ${month}, '${driver}')">+/- Übertrag anpassen (Aktuell: ${pool.carryover.toFixed(2).replace('.', ',')} Std)</button>
+                    </td></tr>`;
+                }
+
+                if (pool.touren.length === 0) {
+                    detailsHtml += `<tr><td colspan="4" style="color:var(--text-muted); font-style:italic;">Keine erledigten Touren in diesem Monat.</td></tr>`;
+                } else {
+                    pool.touren.sort((a,b) => b.key.localeCompare(a.key)).forEach(t => {
+                        const [ty, tm, td] = t.key.split('-');
+                        const editorInfo = isAdmin ? `<span style="color:var(--text-muted); font-size:0.75rem; font-style:italic; margin-left:10px;">(geändert von: ${t.editor})</span>` : '';
+                        
+                        detailsHtml += `
+                            <tr>
+                                <td style="color:var(--text-muted)">${td}.${tm}.${ty}</td>
+                                <td style="color:#64b5f6">${t.tour} ${editorInfo}</td>
+                                <td style="text-align:right; font-weight:bold; color:var(--success-color)">${t.hours.toFixed(2).replace('.', ',')} Std.</td>
+                                ${isAdmin ? `<td style="text-align:right; width:90px;">
+                                    <span style="cursor:pointer; color:var(--text-muted); margin-right:8px;" onclick="revertToPlanned('${t.key}', ${t.index})">Reset</span>
+                                    <span style="cursor:pointer; color:var(--danger-color);" onclick="deleteAssignment('${t.key}', ${t.index})">X</span>
+                                </td>` : ''}
+                            </tr>`;
+                    });
+                }
                 detailsHtml += `</table></td></tr>`;
             }
 
+            const carryoverFormatted = `${pool.carryover >= 0 ? '+' : ''}${pool.carryover.toFixed(2).replace('.', ',')}h`;
+
             tr.innerHTML = `
                 <td><span style="display:inline-block; width:8px; height:8px; background:${punktFarbe}; border-radius:50%; margin-right:6px;"></span><strong>${driver}</strong></td>
-                <td style="color: var(--success-color); font-weight: bold; font-size: 1rem;">${pool.total.toFixed(2).replace('.', ',')} Std.</td>
+                <td style="color: var(--success-color); font-weight: bold;">${pool.total.toFixed(2).replace('.', ',')} Std.</td>
+                <td style="color: ${pool.carryover >= 0 ? 'var(--text-color)' : 'var(--danger-color)'};">${carryoverFormatted}</td>
+                <td style="color: ${bilanzColor}; font-weight: bold; font-size: 0.95rem;">${bilanzSign}${bilanz.toFixed(2).replace('.', ',')} Std.</td>
                 <td style="text-align: center;">
                     <button class="btn-action" style="color: var(--history-color); margin: 0;" onclick="toggleDriverDetails('${driver}')">${detailIcon}</button>
                 </td>
