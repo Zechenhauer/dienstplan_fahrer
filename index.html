@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eisen Krämer - Team-Tourenplaner</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-color: #ff9800;
+            --text-color: #e0e0e0;
+            --text-muted: #888;
+            --success-color: #4caf50;
+            --danger-color: #ff5252;
+            --border-color: #333;
+            --today-bg: rgba(255, 152, 0, 0.15);
+            --history-color: #2196f3;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            border-radius: 12px;
+            z-index: 5;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 15px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .user-info {
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            margin-top: 4px;
+            font-weight: bold;
+        }
+
+        .logout-btn {
+            position: absolute;
+            right: 0;
+            top: 0;
+            background: #333;
+            color: #fff;
+            border: 1px solid var(--border-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background: var(--danger-color);
+        }
+
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+        }
+        #login-screen .login-box {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #login-screen h2 {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            color: #fff;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 6px;
+            width: 100%;
+        }
+        .login-select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-color);
+            background: #2a2a2a;
+            color: #fff;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-color);
+            color: #121212;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .login-btn:hover {
+            background: #ffb74d;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        select, input {
+            background: #2a2a2a;
+            color: #fff;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .filter-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 20px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            padding: 3px 0;
+        }
+
+        .day {
+            background: #252525;
+            aspect-ratio: 1 / 1.15;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1.5px solid transparent;
+            transition: all 0.2s;
+            padding: 4px 2px;
+            min-height: 60px;
+            overflow: hidden;
+        }
+
+        .day.selected-day {
+            border-color: #fff !important;
+            background: #333 !important;
+        }
+
+        .day.today {
+            background: var(--today-bg);
+            border-color: var(--accent-color);
+            box-shadow: inset 0 0 8px rgba(255, 152, 0, 0.3);
+        }
+        .day.today > div:first-child {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .day:hover {
+            border-color: rgba(255,255,255,0.5);
+        }
+
+        .day.empty {
+            background: transparent;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        .day-driver-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: auto;
+            font-size: 0.58rem;
+            overflow: hidden;
+        }
+
+        .day-driver-badge {
+            color: #000;
+            font-weight: bold;
+            padding: 2px 3px;
+            border-radius: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+            line-height: 1.1;
+            border: 1px solid transparent;
+        }
+
+        .day-driver-badge.planned {
+            opacity: 0.65;
+            border: 1.5px dashed rgba(0,0,0,0.5);
+        }
+
+        .day-driver-badge.worked {
+            opacity: 1;
+            border: 1.5px solid rgba(0,0,0,0.2);
+        }
+
+        .work-list {
+            margin-top: 20px;
+        }
+
+        .list-title {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            padding-left: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .title-planned { border-left: 3px solid var(--accent-color); }
+        .title-worked { border-left: 3px solid var(--history-color); margin-top: 25px; }
+
+        .count-badge {
+            font-size: 0.75rem;
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 10px;
+            color: #fff;
+        }
+        
+        .count-badge.hours-total {
+            background: rgba(33, 150, 243, 0.2);
+            color: #64b5f6;
+            font-weight: bold;
+            border: 1px solid rgba(33, 150, 243, 0.4);
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            min-width: 500px;
+        }
+
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: normal;
+            background: #1a1a1a;
+        }
+
+        .no-entries {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 12px;
+            font-style: italic;
+        }
+
+        .admin-only { display: none; }
+        body.admin-mode .admin-only { display: table-cell; }
+
+        .btn-action {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-right: 10px;
+            font-weight: bold;
+            padding: 6px 0;
+        }
+        .btn-delete { color: var(--danger-color); }
+        .btn-delete:hover { text-decoration: underline; }
+        .btn-complete { color: var(--success-color); }
+        .btn-complete:hover { text-decoration: underline; }
+
+        .sub-details-table {
+            background: #161616;
+            width: 100%;
+            margin: 4px 0;
+            border-radius: 4px;
+        }
+        .sub-details-table td {
+            border-bottom: 1px solid #252525;
+            font-size: 0.8rem;
+            padding: 6px 10px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            padding: 10px;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 18px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal h3 {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+        .modal-driver-list {
+            max-height: 140px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 15px;
+            background: #181818;
+        }
+
+        .modal-driver-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid #2a2a2a;
+            font-size: 0.85rem;
+        }
+
+        .modal-select, .modal input {
+            background: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+            width: 100%;
+        }
+
+        .live-hours-info {
+            font-size: 0.8rem;
+            color: var(--success-color);
+            margin-top: -8px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            padding-left: 2px;
+        }
+
+        .btn {
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: bold;
+            width: 100%;
+            text-align: center;
+        }
+        .btn-primary { background: var(--success-color); color: #fff; }
+        .btn-secondary { background: #444; color: #fff; }
+        .btn-danger { background: var(--danger-color); color: #fff; }
+
+        .input-group { display: none; }
+        .form-label { display: block; text-align: left; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 480px) {
+            .controls { grid-template-columns: 1fr; gap: 6px; }
+            .day { font-size: 0.75rem; min-height: 55px; }
+            .day-driver-badge { font-size: 0.52rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-screen" class="hidden">
+    <div class="login-box">
+        <div class="app-title" style="margin-bottom: 5px;">Eisen Krämer</div>
+        <h2>Tourenplaner Login</h2>
+        <span class="form-label" style="text-align: center; margin-top: 5px;">Wer meldet sich an?</span>
+        <select id="user-select" class="login-select">
+            <optgroup label="Admins">
+                <option value="Jürgen">Jürgen (Ich)</option>
+                <option value="Dirk">Dirk</option>
+                <option value="Michael">Michael</option>
+                <option value="Thorsten">Thorsten</option>
+            </optgroup>
+            <optgroup label="Fahrer" id="fahrer-optgroup">
+            </optgroup>
+        </select>
+        <button onclick="handleLogin()" class="login-btn">Anmelden & Speichern</button>
+    </div>
+</div>
+
+<div class="container hidden" id="main-app">
+    <div class="loading-overlay" id="loadingOverlay">Daten werden geladen...</div>
+
+    <header>
+        <div class="app-title">Eisen Krämer</div>
+        <div class="subtitle">Zentrale Routen- & Fahrerplanung</div>
+        <div class="user-info" id="user-display">Angemeldet als: -</div>
+        <button class="logout-btn" onclick="handleLogout()">Abmelden</button>
+    </header>
+
+    <div class="controls">
+        <div>
+            <span class="filter-label">Monat</span>
+            <select id="monthSelect"></select>
+        </div>
+        <div>
+            <span class="filter-label">Jahr</span>
+            <select id="yearSelect"></select>
+        </div>
+    </div>
+
+    <div class="calendar-grid" id="calendar">
+        <div class="weekday">Mo</div>
+        <div class="weekday">Di</div>
+        <div class="weekday">Mi</div>
+        <div class="weekday">Do</div>
+        <div class="weekday">Fr</div>
+        <div class="weekday">Sa</div>
+        <div class="weekday">So</div>
+    </div>
+
+    <div class="work-list">
+        <div class="list-title title-planned">
+            <span id="planned-list-title">Geplante Touren am Tag</span>
+            <span class="count-badge" id="countPlanned">0</span>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Fahrer</th>
+                        <th>Tour</th>
+                        <th>Geplante Std.</th>
+                        <th class="admin-only">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody id="plannedListBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="work-list">
+        <div class="list-title title-worked">
+            <span id="worked-list-title">Geleistete Stunden & Soll-Abgleich</span>
+            <span class="count-badge hours-total" id="totalHoursBadge" style="display: none;">0,00 Std. Gesamt</span>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fahrer</th>
+                        <th>Geleistet</th>
+                        <th>Übertrag</th>
+                        <th>Gesamtbilanz (Soll: 40h)</th>
+                        <th style="width: 60px; text-align: center;">Details</th>
+                    </tr>
+                </thead>
+                <tbody id="workedListBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="actionModal">
+    <div class="modal-content">
+        <h3 id="modalDateLabel">Tag verwalten</h3>
+        
+        <div class="form-label">Eingeteilte Fahrer an diesem Tag:</div>
+        <div class="modal-driver-list" id="modalActiveDriversList"></div>
+
+        <div id="decisionGroup" style="display: flex; flex-direction: column; gap: 8px;">
+            <button class="btn btn-primary" onclick="showAddDriverForm()">+ Neuen Fahrer einteilen</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Schließen</button>
+        </div>
+
+        <div id="addDriverGroup" class="input-group">
+            <span class="form-label">Fahrer auswählen:</span>
+            <select id="modalDriverSelect" class="modal-select" onchange="updateLiveHoursDisplay()"></select>
+            
+            <div id="liveHoursContainer" class="live-hours-info">Aktuelle Monatsstunden: 0,00 Std.</div>
+
+            <span class="form-label">Tour auswählen:</span>
+            <select id="modalTourSelect" class="modal-select">
+                <option value="Essen">Essen</option>
+                <option value="Moers">Moers</option>
+                <option value="Düsseldorf">Düsseldorf</option>
+                <option value="Duisburg">Duisburg</option>
+                <option value="Sondertour">Sondertour</option>
+            </select>
+
+            <span class="form-label">Status:</span>
+            <select id="modalStatusSelect" class="modal-select" onchange="handleStatusChange()">
+                <option value="planned">Geplant (Tour steht an)</option>
+                <option value="worked">Erledigt (Arbeitszeit verbuchen)</option>
+            </select>
+            
+            <span class="form-label">Stunden:</span>
+            <input type="number" id="modalHoursInput" step="0.25" min="0" max="24" placeholder="z.B. 7.5">
+            
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                <button class="btn btn-secondary" onclick="backToDecision()">Zurück</button>
+                <button class="btn btn-primary" onclick="saveDriverAssignment()">Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbw78NXPd0ygZeskt9A1cua_IZCWWo1Y2GY9JPR0vUpBNVO_DOZuY2XvCjl5dZYN639amA/exec";
+    const ADMIN_PIN = "1919";
+    const SOLL_STUNDEN = 40.0;
+
+    const ADMINS = ["Jürgen", "Dirk", "Michael", "Thorsten"];
+    const FAHRER_LISTE = ["Jürgen S.", "Detlef", "Hans-Peter", "Fahrer 4", "Fahrer 5", "Fahrer 6", "Fahrer 7", "Fahrer 8"];
+
+    const FAHRER_FARBEN = {
+        "Jürgen S.": "#81c784",      
+        "Detlef": "#64b5f6",      
+        "Hans-Peter": "#ffb74d",  
+        "Fahrer 4": "#ba68c8",    
+        "Fahrer 5": "#4db6ac",    
+        "Fahrer 6": "#ff8a65",    
+        "Fahrer 7": "#e0e0e0",    
+        "Fahrer 8": "#a1887f"     
+    };
+
+    let currentUser = null;
+    let isAdmin = false;
+
+    let activeSelectedDateStr = ""; 
+    let data = {}; 
+    let currentCalculatedDriverHours = {}; 
+
+    const months = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect = document.getElementById('yearSelect');
+    const calendar = document.getElementById('calendar');
+    const plannedListBody = document.getElementById('plannedListBody');
+    const workedListBody = document.getElementById('workedListBody');
+    const countPlannedEl = document.getElementById('countPlanned');
+    const totalHoursBadge = document.getElementById('totalHoursBadge');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    
+    const actionModal = document.getElementById('actionModal');
+    const modalDateLabel = document.getElementById('modalDateLabel');
+    const modalActiveDriversList = document.getElementById('modalActiveDriversList');
+    const decisionGroup = document.getElementById('decisionGroup');
+    const addDriverGroup = document.getElementById('addDriverGroup');
+    const modalDriverSelect = document.getElementById('modalDriverSelect');
+    const liveHoursContainer = document.getElementById('liveHoursContainer');
+    const modalHoursInput = document.getElementById('modalHoursInput');
+    const modalStatusSelect = document.getElementById('modalStatusSelect');
+
+    let openDriverDetails = {};
+
+    window.onload = function() {
+        const heute = new Date();
+        activeSelectedDateStr = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, '0')}-${String(heute.getDate()).padStart(2, '0')}`;
+        setupDropdowns();
+        checkSavedLogin();
+    };
+
+    function setupDropdowns() {
+        const fahrerGroup = document.getElementById('fahrer-optgroup');
+        fahrerGroup.innerHTML = "";
+        FAHRER_LISTE.forEach(f => {
+            fahrerGroup.innerHTML += `<option value="${f}">${f}</option>`;
+        });
+
+        modalDriverSelect.innerHTML = "";
+        FAHRER_LISTE.forEach(p => {
+            modalDriverSelect.innerHTML += `<option value="${p}">${p}</option>`;
+        });
+
+        months.forEach((m, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = m;
+            monthSelect.appendChild(opt);
+        });
+        
+        const heute = new Date();
+        monthSelect.value = heute.getMonth(); 
+
+        for (let y = 2025; y <= 2028; y++) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            yearSelect.appendChild(opt);
+        }
+        yearSelect.value = heute.getFullYear();
+
+        monthSelect.addEventListener('change', () => { updateActiveDayToMonthFirst(); render(); });
+        yearSelect.addEventListener('change', () => { updateActiveDayToMonthFirst(); render(); });
+    }
+
+    function updateActiveDayToMonthFirst() {
+        const selectedMonth = String(parseInt(monthSelect.value) + 1).padStart(2, '0');
+        const selectedYear = yearSelect.value;
+        activeSelectedDateStr = `${selectedYear}-${selectedMonth}-01`;
+    }
+
+    function checkSavedLogin() {
+        const savedUser = localStorage.getItem('ek_logged_user');
+        if (savedUser) {
+            currentUser = savedUser;
+            isAdmin = ADMINS.includes(savedUser);
+            showApp();
+        } else {
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+        }
+    }
+
+    function handleLogin() {
+        const selected = document.getElementById('user-select').value;
+        
+        if (ADMINS.includes(selected)) {
+            const pin = prompt(`Bitte Admin-PIN für ${selected} eingeben:`);
+            if (pin === ADMIN_PIN) {
+                currentUser = selected;
+                isAdmin = true;
+                localStorage.setItem('ek_logged_user', currentUser);
+                showApp();
+            } else {
+                alert("Falsche PIN!");
+            }
+        } else {
+            loadDataFromSheetForLogin(selected);
+        }
+    }
+
+    async function loadDataFromSheetForLogin(selectedDriver) {
+        showLoading(true, "Überprüfe Login...");
+        try {
+            const response = await fetch(SHEET_API_URL);
+            if (response.ok) {
+                const resJson = await response.json();
+                data = resJson.entries || {};
+                
+                const pwdKey = `pwd_${selectedDriver}`;
+                const savedPwd = data[pwdKey] || ADMIN_PIN;
+
+                const enteredPwd = prompt(`Bitte Passwort für ${selectedDriver} eingeben:`);
+                if (enteredPwd === savedPwd) {
+                    currentUser = selectedDriver;
+                    isAdmin = false;
+                    localStorage.setItem('ek_logged_user', currentUser);
+                    showApp();
+                } else {
+                    alert("Falsches Passwort!");
+                }
+            } else {
+                alert("Netzwerkfehler beim Login.");
+            }
+        } catch (e) {
+            alert("Fehler beim Verbinden zur Tabelle.");
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function handleLogout() {
+        currentUser = null;
+        isAdmin = false;
+        localStorage.removeItem('ek_logged_user');
+        document.body.classList.remove('admin-mode');
+        document.getElementById('main-app').classList.add('hidden');
+        document.getElementById('login-screen').classList.remove('hidden');
+    }
+
+    function showApp() {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        document.getElementById('user-display').innerText = `Angemeldet als: ${currentUser} ${isAdmin ? '(Admin)' : '(Fahrer)'}`;
+        
+        if (isAdmin) {
+            document.body.classList.add('admin-mode');
+            document.getElementById('worked-list-title').innerText = "Geleistete Stunden & Soll-Abgleich (Teamübersicht)";
+        } else {
+            document.body.classList.remove('admin-mode');
+            document.getElementById('worked-list-title').innerText = `Meine Stundenbilanz (${months[parseInt(monthSelect.value)]})`;
+        }
+        
+        loadDataFromSheet();
+    }
+
+    async function loadDataFromSheet() {
+        showLoading(true, "Lade Daten...");
+        try {
+            const response = await fetch(SHEET_API_URL);
+            if (response.ok) {
+                const resJson = await response.json();
+                data = resJson.entries || {};
+                render();
+            }
+        } catch (error) {
+            console.error("Fehler beim Laden:", error);
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async function saveDataToSheet() {
+        showLoading(true, "Aktualisiere Google Tabelle...");
+        try {
+            const payload = { entries: data };
+            await fetch(SHEET_API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            setTimeout(loadDataFromSheet, 1200);
+        } catch (error) {
+            console.error("Fehler beim Speichern:", error);
+            showLoading(false);
+        }
+    }
+
+    function render() {
+        const month = parseInt(monthSelect.value);
+        const year = parseInt(yearSelect.value);
+        
+        renderCalendar(year, month);
+        renderLists(year, month);
+    }
+
+    function renderCalendar(year, month) {
+        const headers = calendar.querySelectorAll('.weekday');
+        calendar.innerHTML = '';
+        headers.forEach(h => calendar.appendChild(h));
+
+        const firstDayIndex = new Date(year, month, 1).getDay();
+        const adjustedFirstDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        const heute = new Date();
+        const heuteTag = heute.getDate();
+        const heuteMonat = heute.getMonth();
+        const heuteJahr = heute.getFullYear();
+
+        for (let i = 0; i < adjustedFirstDay; i++) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'day empty';
+            calendar.appendChild(emptyDiv);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'day';
+            
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            
+            if (day === heuteTag && month === heuteMonat && year === heuteJahr) {
+                dayDiv.classList.add('today');
+            }
+
+            if (dateStr === activeSelectedDateStr) {
+                dayDiv.classList.add('selected-day');
+            }
+
+            const dayNum = document.createElement('div');
+            dayNum.textContent = day;
+            dayDiv.appendChild(dayNum);
+
+            const driverListDiv = document.createElement('div');
+            driverListDiv.className = 'day-driver-list';
+
+            let dayAssignments = data[dateStr] || [];
+            if (!Array.isArray(dayAssignments)) dayAssignments = [];
+
+            dayAssignments.sort((a, b) => a.driver.localeCompare(b.driver));
+
+            dayAssignments.forEach(assign => {
+                if (isAdmin || assign.driver === currentUser) {
+                    const badge = document.createElement('div');
+                    badge.className = `day-driver-badge ${assign.status}`;
+                    const fahrerFarbe = FAHRER_FARBEN[assign.driver] || "#e0e0e0";
+                    badge.style.backgroundColor = fahrerFarbe;
+                    const statusIcon = assign.status === 'worked' ? '✓ ' : '';
+                    badge.textContent = `${statusIcon}${assign.driver.substring(0,6)}: ${assign.tour}`;
+                    driverListDiv.appendChild(badge);
+                }
+            });
+
+            dayDiv.appendChild(driverListDiv);
+
+            dayDiv.onclick = () => {
+                activeSelectedDateStr = dateStr;
+                render();
+                if (isAdmin) {
+                    openModal(dateStr, day, months[month]);
+                }
+            };
+
+            calendar.appendChild(dayDiv);
+        }
+    }
+
+    function toggleDriverDetails(driverName) {
+        openDriverDetails[driverName] = !openDriverDetails[driverName];
+        render();
+    }
+
+    function updateCarryover(year, month, driver) {
+        const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${driver}`;
+        const currentVal = data[mKey] !== undefined ? data[mKey] : 0.0;
+        const inputStr = prompt(`Übertrag (Plus- oder Minusstunden) für ${driver} im Monat ${months[month]} ${year} eingeben:\n(z.B. -5 für 5 Minusstunden oder 3.5 für Plus-Stunden)`, currentVal);
+        
+        if (inputStr !== null) {
+            const val = parseFloat(inputStr.replace(',', '.'));
+            if (!isNaN(val)) {
+                data[mKey] = val;
+                saveDataToSheet();
+            } else {
+                alert("Bitte eine gültige Zahl eingeben!");
+            }
+        }
+    }
+
+    function updateDriverPassword(driver) {
+        const pwdKey = `pwd_${driver}`;
+        const currentPwd = data[pwdKey] || "";
+        const newPwd = prompt(`Neues Passwort für ${driver} festlegen:`, currentPwd);
+        
+        if (newPwd !== null) {
+            if (newPwd.trim() === "") {
+                delete data[pwdKey]; 
+            } else {
+                data[pwdKey] = newPwd.trim();
+            }
+            saveDataToSheet();
+            alert(`Passwort für ${driver} wurde aktualisiert!`);
+        }
+    }
+
+    function renderLists(year, month) {
+        plannedListBody.innerHTML = '';
+        workedListBody.innerHTML = '';
+        
+        let countPlanned = 0;
+        let totalHoursAllDrivers = 0.0;
+        
+        const [selY, selM, selD] = activeSelectedDateStr.split('-');
+        document.getElementById('planned-list-title').innerText = `Geplante Touren am ${selD}.${selM}.${selY}`;
+
+        let targetDayAssignments = data[activeSelectedDateStr] || [];
+        if (!Array.isArray(targetDayAssignments)) targetDayAssignments = [];
+
+        targetDayAssignments.forEach((assign, index) => {
+            if (!isAdmin && assign.driver !== currentUser) return;
+            
+            if (assign.status === 'planned') {
+                countPlanned++;
+                const tr = document.createElement('tr');
+                const punktFarbe = FAHRER_FARBEN[assign.driver] || "#e0e0e0";
+
+                tr.innerHTML = `
+                    <td>${selD}.${selM}.${selY}</td>
+                    <td><span style="display:inline-block; width:8px; height:8px; background:${punktFarbe}; border-radius:50%; margin-right:6px;"></span><strong>${assign.driver}</strong></td>
+                    <td><span style="color: var(--accent-color);">${assign.tour}</span></td>
+                    <td>${parseFloat(assign.hours || 0).toFixed(2).replace('.', ',')} Std.</td>
+                    <td class="admin-only">
+                        <button class="btn-action btn-complete" onclick="markPlannedAsWorked('${activeSelectedDateStr}', ${index})">Erledigt</button>
+                        <button class="btn-action btn-delete" onclick="deleteAssignment('${activeSelectedDateStr}', ${index})">Löschen</button>
+                    </td>
+                `;
+                plannedListBody.appendChild(tr);
+            }
+        });
+
+        countPlannedEl.textContent = countPlanned;
+
+        const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+        const keys = Object.keys(data).filter(key => key.startsWith(prefix) && !key.startsWith("carryover_"));
+        
+        currentCalculatedDriverHours = {};
+        FAHRER_LISTE.forEach(f => { currentCalculatedDriverHours[f] = 0.0; });
+
+        let fahrerStundenPool = {};
+        FAHRER_LISTE.forEach(f => {
+            if (isAdmin || f === currentUser) {
+                const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${f}`;
+                const carryoverVal = data[mKey] !== undefined ? parseFloat(data[mKey]) : 0.0;
+
+                fahrerStundenPool[f] = { total: 0.0, carryover: carryoverVal, touren: [] };
+            }
+        });
+
+        keys.forEach(key => {
+            let assignments = data[key] || [];
+            if (!Array.isArray(assignments)) assignments = [];
+
+            assignments.forEach((assign, index) => {
+                if (assign.status === 'worked') {
+                    if (currentCalculatedDriverHours[assign.driver] !== undefined) {
+                        currentCalculatedDriverHours[assign.driver] += parseFloat(assign.hours || 0);
+                    }
+                    if (fahrerStundenPool[assign.driver]) {
+                        const hrs = parseFloat(assign.hours || 0);
+                        fahrerStundenPool[assign.driver].total += hrs;
+                        fahrerStundenPool[assign.driver].touren.push({
+                            key: key,
+                            index: index,
+                            tour: assign.tour,
+                            hours: hrs,
+                            editor: assign.bearbeitet_von || "Unbekannt"
+                        });
+                    }
+                }
+            });
+        });
+
+        Object.keys(fahrerStundenPool).forEach(driver => {
+            const pool = fahrerStundenPool[driver];
+            totalHoursAllDrivers += pool.total;
+
+            const bilanz = (pool.total + pool.carryover) - SOLL_STUNDEN;
+            const bilanzColor = bilanz >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+            const bilanzSign = bilanz > 0 ? '+' : '';
+
+            const tr = document.createElement('tr');
+            const punktFarbe = FAHRER_FARBEN[driver] || "#e0e0e0";
+            const detailIcon = openDriverDetails[driver] ? '▼' : '👁️';
+
+            let detailsHtml = "";
+            if (openDriverDetails[driver]) {
+                detailsHtml = `<tr><td colspan="5"><table class="sub-details-table">`;
+                
+                if (isAdmin) {
+                    detailsHtml += `<tr><td colspan="4" style="background:#202020; padding:8px; display:flex; flex-direction:column; gap:6px;">
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding:6px; width:100%;" onclick="updateCarryover(${year}, ${month}, '${driver}')">+/- Übertrag anpassen (Aktuell: ${pool.carryover.toFixed(2).replace('.', ',')} Std)</button>
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding:6px; width:100%; background:#2c3e50;" onclick="updateDriverPassword('${driver}')">🔑 Passwort festlegen</button>
+                    </td></tr>`;
+                }
+
+                if (pool.touren.length === 0) {
+                    detailsHtml += `<tr><td colspan="4" style="color:var(--text-muted); font-style:italic;">Keine erledigten Touren in diesem Monat.</td></tr>`;
+                } else {
+                    pool.touren.sort((a,b) => b.key.localeCompare(a.key)).forEach(t => {
+                        const [ty, tm, td] = t.key.split('-');
+                        const editorInfo = isAdmin ? `<span style="color:var(--text-muted); font-size:0.75rem; font-style:italic; margin-left:10px;">(geändert von: ${t.editor})</span>` : '';
+                        
+                        detailsHtml += `
+                            <tr>
+                                <td style="color:var(--text-muted)">${td}.${tm}.${ty}</td>
+                                <td style="color:#64b5f6">${t.tour} ${editorInfo}</td>
+                                <td style="text-align:right; font-weight:bold; color:var(--success-color)">${t.hours.toFixed(2).replace('.', ',')} Std.</td>
+                                ${isAdmin ? `<td style="text-align:right; width:90px;">
+                                    <span style="cursor:pointer; color:var(--text-muted); margin-right:8px;" onclick="revertToPlanned('${t.key}', ${t.index})">Reset</span>
+                                    <span style="cursor:pointer; color:var(--danger-color);" onclick="deleteAssignment('${t.key}', ${t.index})">X</span>
+                                </td>` : ''}
+                            </tr>`;
+                    });
+                }
+                detailsHtml += `</table></td></tr>`;
+            }
+
+            const carryoverFormatted = `${pool.carryover >= 0 ? '+' : ''}${pool.carryover.toFixed(2).replace('.', ',')}h`;
+
+            tr.innerHTML = `
+                <td><span style="display:inline-block; width:8px; height:8px; background:${punktFarbe}; border-radius:50%; margin-right:6px;"></span><strong>${driver}</strong></td>
+                <td style="color: var(--success-color); font-weight: bold;">${pool.total.toFixed(2).replace('.', ',')} Std.</td>
+                <td style="color: ${pool.carryover >= 0 ? 'var(--text-color)' : 'var(--danger-color)'};">${carryoverFormatted}</td>
+                <td style="color: ${bilanzColor}; font-weight: bold; font-size: 0.95rem;">${bilanzSign}${bilanz.toFixed(2).replace('.', ',')} Std.</td>
+                <td style="text-align: center;">
+                    <button class="btn-action" style="color: var(--history-color); margin: 0;" onclick="toggleDriverDetails('${driver}')">${detailIcon}</button>
+                </td>
+            `;
+
+            workedListBody.appendChild(tr);
+            if (detailsHtml) {
+                const tempRow = document.createElement('tbody');
+                tempRow.innerHTML = detailsHtml;
+                workedListBody.appendChild(tempRow.firstElementChild);
+            }
+        });
+
+        const colSpan = isAdmin ? 5 : 4;
+        if (countPlanned === 0) plannedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine geplanten Touren an diesem Tag. (Kalender anklicken zum Wechseln)</td></tr>`;
+
+        totalHoursBadge.textContent = `${totalHoursAllDrivers.toFixed(2).replace('.', ',')} Std. Gesamt`;
+    }
+
+    function openModal(dateStr, day, monthName) {
+        activeSelectedDateStr = dateStr; 
+        modalDateLabel.textContent = `${day}. ${monthName} 2026`;
+        updateModalActiveDrivers();
+        decisionGroup.style.display = 'flex';
+        addDriverGroup.style.display = 'none';
+        actionModal.style.display = 'flex';
+    }
+
+    function updateModalActiveDrivers() {
+        modalActiveDriversList.innerHTML = '';
+        let assignments = data[activeSelectedDateStr] || [];
+        if (!Array.isArray(assignments)) assignments = [];
+
+        if (assignments.length === 0) {
+            modalActiveDriversList.innerHTML = `<div style="padding:10px; text-align:center; color:var(--text-muted); font-style:italic;">Keine Einträge.</div>`;
+            return;
+        }
+
+        assignments.sort((a, b) => a.driver.localeCompare(b.driver));
+
+        assignments.forEach((assign, idx) => {
+            const item = document.createElement('div');
+            item.className = 'modal-driver-item';
+            const statusLabel = assign.status === 'worked' ? '🟢 Erledigt' : '🟡 Geplant';
+            item.innerHTML = `
+                <div><strong>${assign.driver}</strong> - ${assign.tour} <br><small style="color:var(--text-muted)">${statusLabel} (${assign.hours}h)</small></div>
+                <button class="btn btn-danger" style="width:auto; padding:4px 8px; font-size:0.75rem;" onclick="deleteAssignment('${activeSelectedDateStr}', ${idx})">X</button>
+            `;
+            modalActiveDriversList.appendChild(item);
+        });
+    }
+
+    function updateLiveHoursDisplay() {
+        const selectedDriver = modalDriverSelect.value;
+        const currentHours = currentCalculatedDriverHours[selectedDriver] || 0.0;
+        liveHoursContainer.innerText = `Aktuelle Monatsstunden von ${selectedDriver}: ${currentHours.toFixed(2).replace('.', ',')} Std.`;
+    }
+
+    function closeModal() { actionModal.style.display = 'none'; }
+    
+    function showAddDriverForm() { 
+        decisionGroup.style.display = 'none'; 
+        addDriverGroup.style.display = 'block'; 
+        modalStatusSelect.value = "planned";
+        modalHoursInput.value = "0"; 
+        modalHoursInput.min = "0";
+        updateLiveHoursDisplay(); 
+    }
+    
+    function backToDecision() { addDriverGroup.style.display = 'none'; decisionGroup.style.display = 'flex'; }
+    
+    function handleStatusChange() {
+        if (modalStatusSelect.value === 'planned') {
+            modalHoursInput.value = "0";
+            modalHoursInput.min = "0";
+        } else {
+            modalHoursInput.value = "";
+            modalHoursInput.min = "0.1";
+        }
+    }
+
+    function saveDriverAssignment() {
+        const driver = modalDriverSelect.value;
+        const tour = document.getElementById('modalTourSelect').value;
+        const status = modalStatusSelect.value;
+        const hours = parseFloat(modalHoursInput.value);
+
+        if (isNaN(hours) || hours < 0) { return alert("Gültige Stunden eingeben!"); }
+        if (!data[activeSelectedDateStr]) data[activeSelectedDateStr] = [];
+
+        const alreadyAssignedIdx = data[activeSelectedDateStr].findIndex(a => a.driver === driver);
+        const newAssignment = { driver, tour, status, hours, bearbeitet_von: currentUser };
+
+        if (alreadyAssignedIdx > -1) {
+            if (confirm(`${driver} ist bereits eingeteilt. Überschreiben?`)) {
+                data[activeSelectedDateStr][alreadyAssignedIdx] = newAssignment;
+            } else { return; }
+        } else {
+            data[activeSelectedDateStr].push(newAssignment);
+        }
+
+        saveDataToSheet();
+        closeModal();
+    }
+
+    function markPlannedAsWorked(key, index) {
+        const hoursStr = prompt("Tatsächliche Stunden eingeben:", data[key][index].hours);
+        const hours = parseFloat(hoursStr);
+        if (!isNaN(hours) && hours >= 0) {
+            data[key][index].status = 'worked';
+            data[key][index].hours = hours;
+            data[key][index].bearbeitet_von = currentUser; 
+            saveDataToSheet();
+        }
+    }
+
+    function revertToPlanned(key, index) {
+        if (confirm("Möchtest du diese Tour wieder auf den Status 'Geplant' zurücksetzen?")) {
+            data[key][index].status = 'planned';
+            data[key][index].hours = 0;
+            data[key][index].bearbeitet_von = currentUser;
+            saveDataToSheet();
+        }
+    }
+
+    function deleteAssignment(key, index) {
+        if (confirm("Eintrag wirklich löschen?")) {
+            data[key].splice(index, 1);
+            if (data[key].length === 0) delete data[key];
+            saveDataToSheet();
+            closeModal();
+        }
+    }
+
+    function showLoading(show, message = "") {
+        loadingOverlay.textContent = message;
+        loadingOverlay.style.display = show ? 'flex' : 'none';
+    }
+
+    window.onclick = function(e) { if (e.target == actionModal) closeModal(); }
+</script>
+</body>
+</html>
