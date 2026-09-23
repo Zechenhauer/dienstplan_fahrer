@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eisen Krämer - Team-Tourenplaner</title>
+    <!-- Supabase Client Bibliothek laden -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg-color: #121212;
@@ -612,7 +614,10 @@
 </div>
 
 <script>
-    const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbw78NXPd0ygZeskt9A1cua_IZCWWo1Y2GY9JPR0vUpBNVO_DOZuY2XvCjl5dZYN639amA/exec";
+    const SUPABASE_URL = 'https://lhusylpjnujlqomougmg.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_yXEueWILvAq-Vm2VfTuYyg_BIQeE1KK';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     const ADMIN_PIN = "1919";
     const SOLL_STUNDEN = 40.0;
 
@@ -635,7 +640,8 @@
     let isAdmin = false;
 
     let activeSelectedDateStr = ""; 
-    let data = {}; 
+    let tourenDaten = []; // Array von Tabellen-Zeilen
+    let configDaten = {}; // Objekt für Passwörter & Überträge
     let currentCalculatedDriverHours = {}; 
 
     const months = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -720,7 +726,7 @@
         }
     }
 
-    function handleLogin() {
+    async function handleLogin() {
         const selected = document.getElementById('user-select').value;
         
         if (ADMINS.includes(selected)) {
@@ -734,35 +740,30 @@
                 alert("Falsche PIN!");
             }
         } else {
-            loadDataFromSheetForLogin(selected);
+            await loadDataForLogin(selected);
         }
     }
 
-    async function loadDataFromSheetForLogin(selectedDriver) {
+    async function loadDataForLogin(selectedDriver) {
         showLoading(true, "Überprüfe Login...");
         try {
-            const response = await fetch(SHEET_API_URL);
-            if (response.ok) {
-                const resJson = await response.json();
-                data = resJson.entries || {};
-                
-                const pwdKey = `pwd_${selectedDriver}`;
-                const savedPwd = data[pwdKey] || ADMIN_PIN;
+            await fetchAllData();
+            
+            const pwdKey = `pwd_${selectedDriver}`;
+            const savedPwd = configDaten[pwdKey] || ADMIN_PIN;
 
-                const enteredPwd = prompt(`Bitte Passwort für ${selectedDriver} eingeben:`);
-                if (enteredPwd === savedPwd) {
-                    currentUser = selectedDriver;
-                    isAdmin = false;
-                    localStorage.setItem('ek_logged_user', currentUser);
-                    showApp();
-                } else {
-                    alert("Falsches Passwort!");
-                }
+            const enteredPwd = prompt(`Bitte Passwort für ${selectedDriver} eingeben:`);
+            if (enteredPwd === savedPwd) {
+                currentUser = selectedDriver;
+                isAdmin = false;
+                localStorage.setItem('ek_logged_user', currentUser);
+                showApp();
             } else {
-                alert("Netzwerkfehler beim Login.");
+                alert("Falsches Passwort!");
             }
         } catch (e) {
-            alert("Fehler beim Verbinden zur Tabelle.");
+            console.error(e);
+            alert("Fehler beim Verbinden zur Datenbank.");
         } finally {
             showLoading(false);
         }
@@ -790,18 +791,35 @@
             document.getElementById('worked-list-title').innerText = `Meine Stundenbilanz (${months[parseInt(monthSelect.value)]})`;
         }
         
-        loadDataFromSheet();
+        loadData();
     }
 
-    async function loadDataFromSheet() {
+    async function fetchAllData() {
+        // 1. Touren laden
+        let { data: tourenRows, error: err1 } = await supabaseClient
+            .from('eisen_kraemer_touren')
+            .select('*');
+        if (!err1 && tourenRows) {
+            tourenDaten = tourenRows;
+        }
+
+        // 2. Config (Passwörter & Überträge) laden
+        let { data: configRows, error: err2 } = await supabaseClient
+            .from('eisen_kraemer_config')
+            .select('*');
+        if (!err2 && configRows) {
+            configDaten = {};
+            configRows.forEach(row => {
+                configDaten[row.schluessel] = row.wert;
+            });
+        }
+    }
+
+    async function loadData() {
         showLoading(true, "Lade Daten...");
         try {
-            const response = await fetch(SHEET_API_URL);
-            if (response.ok) {
-                const resJson = await response.json();
-                data = resJson.entries || {};
-                render();
-            }
+            await fetchAllData();
+            render();
         } catch (error) {
             console.error("Fehler beim Laden:", error);
         } finally {
@@ -809,21 +827,19 @@
         }
     }
 
-    async function saveDataToSheet() {
-        showLoading(true, "Aktualisiere Google Tabelle...");
-        try {
-            const payload = { entries: data };
-            await fetch(SHEET_API_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            setTimeout(loadDataFromSheet, 1200);
-        } catch (error) {
-            console.error("Fehler beim Speichern:", error);
-            showLoading(false);
-        }
+    async function saveConfigKey(key, value) {
+        configDaten[key] = value;
+        await supabaseClient
+            .from('eisen_kraemer_config')
+            .upsert({ schluessel: key, wert: String(value) }, { onConflict: 'schluessel' });
+    }
+
+    async function removeConfigKey(key) {
+        delete configDaten[key];
+        await supabaseClient
+            .from('eisen_kraemer_config')
+            .delete()
+            .eq('schluessel', key);
     }
 
     function render() {
@@ -875,19 +891,17 @@
             const driverListDiv = document.createElement('div');
             driverListDiv.className = 'day-driver-list';
 
-            let dayAssignments = data[dateStr] || [];
-            if (!Array.isArray(dayAssignments)) dayAssignments = [];
-
-            dayAssignments.sort((a, b) => a.driver.localeCompare(b.driver));
+            let dayAssignments = tourenDaten.filter(t => t.datum === dateStr);
+            dayAssignments.sort((a, b) => a.fahrer.localeCompare(b.fahrer));
 
             dayAssignments.forEach(assign => {
-                if (isAdmin || assign.driver === currentUser) {
+                if (isAdmin || assign.fahrer === currentUser) {
                     const badge = document.createElement('div');
                     badge.className = `day-driver-badge ${assign.status}`;
-                    const fahrerFarbe = FAHRER_FARBEN[assign.driver] || "#e0e0e0";
+                    const fahrerFarbe = FAHRER_FARBEN[assign.fahrer] || "#e0e0e0";
                     badge.style.backgroundColor = fahrerFarbe;
                     const statusIcon = assign.status === 'worked' ? '✓ ' : '';
-                    badge.textContent = `${statusIcon}${assign.driver.substring(0,6)}: ${assign.tour}`;
+                    badge.textContent = `${statusIcon}${assign.fahrer.substring(0,6)}: ${assign.tour}`;
                     driverListDiv.appendChild(badge);
                 }
             });
@@ -911,34 +925,37 @@
         render();
     }
 
-    function updateCarryover(year, month, driver) {
+    async function updateCarryover(year, month, driver) {
         const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${driver}`;
-        const currentVal = data[mKey] !== undefined ? data[mKey] : 0.0;
+        const currentVal = configDaten[mKey] !== undefined ? parseFloat(configDaten[mKey]) : 0.0;
         const inputStr = prompt(`Übertrag (Plus- oder Minusstunden) für ${driver} im Monat ${months[month]} ${year} eingeben:\n(z.B. -5 für 5 Minusstunden oder 3.5 für Plus-Stunden)`, currentVal);
         
         if (inputStr !== null) {
             const val = parseFloat(inputStr.replace(',', '.'));
             if (!isNaN(val)) {
-                data[mKey] = val;
-                saveDataToSheet();
+                showLoading(true, "Speichere Übertrag...");
+                await saveConfigKey(mKey, val);
+                showLoading(false);
+                render();
             } else {
                 alert("Bitte eine gültige Zahl eingeben!");
             }
         }
     }
 
-    function updateDriverPassword(driver) {
+    async function updateDriverPassword(driver) {
         const pwdKey = `pwd_${driver}`;
-        const currentPwd = data[pwdKey] || "";
+        const currentPwd = configDaten[pwdKey] || "";
         const newPwd = prompt(`Neues Passwort für ${driver} festlegen:`, currentPwd);
         
         if (newPwd !== null) {
+            showLoading(true, "Speichere Passwort...");
             if (newPwd.trim() === "") {
-                delete data[pwdKey]; 
+                await removeConfigKey(pwdKey);
             } else {
-                data[pwdKey] = newPwd.trim();
+                await saveConfigKey(pwdKey, newPwd.trim());
             }
-            saveDataToSheet();
+            showLoading(false);
             alert(`Passwort für ${driver} wurde aktualisiert!`);
         }
     }
@@ -953,25 +970,24 @@
         const [selY, selM, selD] = activeSelectedDateStr.split('-');
         document.getElementById('planned-list-title').innerText = `Geplante Touren am ${selD}.${selM}.${selY}`;
 
-        let targetDayAssignments = data[activeSelectedDateStr] || [];
-        if (!Array.isArray(targetDayAssignments)) targetDayAssignments = [];
+        let targetDayAssignments = tourenDaten.filter(t => t.datum === activeSelectedDateStr);
 
-        targetDayAssignments.forEach((assign, index) => {
-            if (!isAdmin && assign.driver !== currentUser) return;
+        targetDayAssignments.forEach((assign) => {
+            if (!isAdmin && assign.fahrer !== currentUser) return;
             
             if (assign.status === 'planned') {
                 countPlanned++;
                 const tr = document.createElement('tr');
-                const punktFarbe = FAHRER_FARBEN[assign.driver] || "#e0e0e0";
+                const punktFarbe = FAHRER_FARBEN[assign.fahrer] || "#e0e0e0";
 
                 tr.innerHTML = `
                     <td>${selD}.${selM}.${selY}</td>
-                    <td><span style="display:inline-block; width:8px; height:8px; background:${punktFarbe}; border-radius:50%; margin-right:6px;"></span><strong>${assign.driver}</strong></td>
+                    <td><span style="display:inline-block; width:8px; height:8px; background:${punktFarbe}; border-radius:50%; margin-right:6px;"></span><strong>${assign.fahrer}</strong></td>
                     <td><span style="color: var(--accent-color);">${assign.tour}</span></td>
-                    <td>${parseFloat(assign.hours || 0).toFixed(2).replace('.', ',')} Std.</td>
+                    <td>${parseFloat(assign.stunden || 0).toFixed(2).replace('.', ',')} Std.</td>
                     <td class="admin-only">
-                        <button class="btn-action btn-complete" onclick="markPlannedAsWorked('${activeSelectedDateStr}', ${index})">Erledigt</button>
-                        <button class="btn-action btn-delete" onclick="deleteAssignment('${activeSelectedDateStr}', ${index})">Löschen</button>
+                        <button class="btn-action btn-complete" onclick="markPlannedAsWorked(${assign.id})">Erledigt</button>
+                        <button class="btn-action btn-delete" onclick="deleteAssignment(${assign.id})">Löschen</button>
                     </td>
                 `;
                 plannedListBody.appendChild(tr);
@@ -981,7 +997,6 @@
         countPlannedEl.textContent = countPlanned;
 
         const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-        const keys = Object.keys(data).filter(key => key.startsWith(prefix) && !key.startsWith("carryover_"));
         
         currentCalculatedDriverHours = {};
         FAHRER_LISTE.forEach(f => { currentCalculatedDriverHours[f] = 0.0; });
@@ -990,34 +1005,29 @@
         FAHRER_LISTE.forEach(f => {
             if (isAdmin || f === currentUser) {
                 const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${f}`;
-                const carryoverVal = data[mKey] !== undefined ? parseFloat(data[mKey]) : 0.0;
+                const carryoverVal = configDaten[mKey] !== undefined ? parseFloat(configDaten[mKey]) : 0.0;
 
                 fahrerStundenPool[f] = { total: 0.0, carryover: carryoverVal, touren: [] };
             }
         });
 
-        keys.forEach(key => {
-            let assignments = data[key] || [];
-            if (!Array.isArray(assignments)) assignments = [];
-
-            assignments.forEach((assign, index) => {
-                if (assign.status === 'worked') {
-                    if (currentCalculatedDriverHours[assign.driver] !== undefined) {
-                        currentCalculatedDriverHours[assign.driver] += parseFloat(assign.hours || 0);
-                    }
-                    if (fahrerStundenPool[assign.driver]) {
-                        const hrs = parseFloat(assign.hours || 0);
-                        fahrerStundenPool[assign.driver].total += hrs;
-                        fahrerStundenPool[assign.driver].touren.push({
-                            key: key,
-                            index: index,
-                            tour: assign.tour,
-                            hours: hrs,
-                            editor: assign.bearbeitet_von || "Unbekannt"
-                        });
-                    }
+        tourenDaten.forEach(assign => {
+            if (assign.datum && assign.datum.startsWith(prefix) && assign.status === 'worked') {
+                if (currentCalculatedDriverHours[assign.fahrer] !== undefined) {
+                    currentCalculatedDriverHours[assign.fahrer] += parseFloat(assign.stunden || 0);
                 }
-            });
+                if (fahrerStundenPool[assign.fahrer]) {
+                    const hrs = parseFloat(assign.stunden || 0);
+                    fahrerStundenPool[assign.fahrer].total += hrs;
+                    fahrerStundenPool[assign.fahrer].touren.push({
+                        id: assign.id,
+                        datum: assign.datum,
+                        tour: assign.tour,
+                        hours: hrs,
+                        editor: assign.bearbeitet_von || "Unbekannt"
+                    });
+                }
+            }
         });
 
         Object.keys(fahrerStundenPool).forEach(driver => {
@@ -1046,8 +1056,8 @@
                 if (pool.touren.length === 0) {
                     detailsHtml += `<tr><td colspan="4" style="color:var(--text-muted); font-style:italic;">Keine erledigten Touren in diesem Monat.</td></tr>`;
                 } else {
-                    pool.touren.sort((a,b) => b.key.localeCompare(a.key)).forEach(t => {
-                        const [ty, tm, td] = t.key.split('-');
+                    pool.touren.sort((a,b) => b.datum.localeCompare(a.datum)).forEach(t => {
+                        const [ty, tm, td] = t.datum.split('-');
                         const editorInfo = isAdmin ? `<span style="color:var(--text-muted); font-size:0.75rem; font-style:italic; margin-left:10px;">(geändert von: ${t.editor})</span>` : '';
                         
                         detailsHtml += `
@@ -1056,8 +1066,8 @@
                                 <td style="color:#64b5f6">${t.tour} ${editorInfo}</td>
                                 <td style="text-align:right; font-weight:bold; color:var(--success-color)">${t.hours.toFixed(2).replace('.', ',')} Std.</td>
                                 ${isAdmin ? `<td style="text-align:right; width:90px;">
-                                    <span style="cursor:pointer; color:var(--text-muted); margin-right:8px;" onclick="revertToPlanned('${t.key}', ${t.index})">Reset</span>
-                                    <span style="cursor:pointer; color:var(--danger-color);" onclick="deleteAssignment('${t.key}', ${t.index})">X</span>
+                                    <span style="cursor:pointer; color:var(--text-muted); margin-right:8px;" onclick="revertToPlanned(${t.id})">Reset</span>
+                                    <span style="cursor:pointer; color:var(--danger-color);" onclick="deleteAssignment(${t.id})">X</span>
                                 </td>` : ''}
                             </tr>`;
                     });
@@ -1102,23 +1112,22 @@
 
     function updateModalActiveDrivers() {
         modalActiveDriversList.innerHTML = '';
-        let assignments = data[activeSelectedDateStr] || [];
-        if (!Array.isArray(assignments)) assignments = [];
+        let assignments = tourenDaten.filter(t => t.datum === activeSelectedDateStr);
 
         if (assignments.length === 0) {
             modalActiveDriversList.innerHTML = `<div style="padding:10px; text-align:center; color:var(--text-muted); font-style:italic;">Keine Einträge.</div>`;
             return;
         }
 
-        assignments.sort((a, b) => a.driver.localeCompare(b.driver));
+        assignments.sort((a, b) => a.fahrer.localeCompare(b.fahrer));
 
-        assignments.forEach((assign, idx) => {
+        assignments.forEach((assign) => {
             const item = document.createElement('div');
             item.className = 'modal-driver-item';
             const statusLabel = assign.status === 'worked' ? '🟢 Erledigt' : '🟡 Geplant';
             item.innerHTML = `
-                <div><strong>${assign.driver}</strong> - ${assign.tour} <br><small style="color:var(--text-muted)">${statusLabel} (${assign.hours}h)</small></div>
-                <button class="btn btn-danger" style="width:auto; padding:4px 8px; font-size:0.75rem;" onclick="deleteAssignment('${activeSelectedDateStr}', ${idx})">X</button>
+                <div><strong>${assign.fahrer}</strong> - ${assign.tour} <br><small style="color:var(--text-muted)">${statusLabel} (${assign.stunden}h)</small></div>
+                <button class="btn btn-danger" style="width:auto; padding:4px 8px; font-size:0.75rem;" onclick="deleteAssignment(${assign.id})">X</button>
             `;
             modalActiveDriversList.appendChild(item);
         });
@@ -1153,56 +1162,96 @@
         }
     }
 
-    function saveDriverAssignment() {
-        const driver = modalDriverSelect.value;
+    async function saveDriverAssignment() {
+        const fahrer = modalDriverSelect.value;
         const tour = document.getElementById('modalTourSelect').value;
         const status = modalStatusSelect.value;
-        const hours = parseFloat(modalHoursInput.value);
+        const stunden = parseFloat(modalHoursInput.value);
 
-        if (isNaN(hours) || hours < 0) { return alert("Gültige Stunden eingeben!"); }
-        if (!data[activeSelectedDateStr]) data[activeSelectedDateStr] = [];
+        if (isNaN(stunden) || stunden < 0) { return alert("Gültige Stunden eingeben!"); }
 
-        const alreadyAssignedIdx = data[activeSelectedDateStr].findIndex(a => a.driver === driver);
-        const newAssignment = { driver, tour, status, hours, bearbeitet_von: currentUser };
+        showLoading(true, "Speichere Tour...");
 
-        if (alreadyAssignedIdx > -1) {
-            if (confirm(`${driver} ist bereits eingeteilt. Überschreiben?`)) {
-                data[activeSelectedDateStr][alreadyAssignedIdx] = newAssignment;
-            } else { return; }
+        // Prüfen, ob der Fahrer an dem Tag schon eingeteilt ist
+        let existing = tourenDaten.find(t => t.datum === activeSelectedDateStr && t.fahrer === fahrer);
+
+        if (existing) {
+            if (confirm(`${fahrer} ist bereits an diesem Tag eingeteilt. Überschreiben?`)) {
+                await supabaseClient
+                    .from('eisen_kraemer_touren')
+                    .update({ tour, status, stunden, bearbeitet_von: currentUser })
+                    .eq('id', existing.id);
+            } else {
+                showLoading(false);
+                return;
+            }
         } else {
-            data[activeSelectedDateStr].push(newAssignment);
+            await supabaseClient
+                .from('eisen_kraemer_touren')
+                .insert([{
+                    datum: activeSelectedDateStr,
+                    fahrer,
+                    tour,
+                    status,
+                    stunden,
+                    bearbeitet_von: currentUser
+                }]);
         }
 
-        saveDataToSheet();
+        await fetchAllData();
+        showLoading(false);
         closeModal();
+        render();
+        updateModalActiveDrivers();
     }
 
-    function markPlannedAsWorked(key, index) {
-        const hoursStr = prompt("Tatsächliche Stunden eingeben:", data[key][index].hours);
-        const hours = parseFloat(hoursStr);
-        if (!isNaN(hours) && hours >= 0) {
-            data[key][index].status = 'worked';
-            data[key][index].hours = hours;
-            data[key][index].bearbeitet_von = currentUser; 
-            saveDataToSheet();
+    async function markPlannedAsWorked(id) {
+        let entry = tourenDaten.find(t => t.id === id);
+        if (!entry) return;
+
+        const hoursStr = prompt("Tatsächliche Stunden eingeben:", entry.stunden);
+        const stunden = parseFloat(hoursStr);
+        if (!isNaN(stunden) && stunden >= 0) {
+            showLoading(true, "Aktualisiere...");
+            await supabaseClient
+                .from('eisen_kraemer_touren')
+                .update({ status: 'worked', stunden, bearbeitet_von: currentUser })
+                .eq('id', id);
+
+            await fetchAllData();
+            showLoading(false);
+            render();
+            updateModalActiveDrivers();
         }
     }
 
-    function revertToPlanned(key, index) {
+    async function revertToPlanned(id) {
         if (confirm("Möchtest du diese Tour wieder auf den Status 'Geplant' zurücksetzen?")) {
-            data[key][index].status = 'planned';
-            data[key][index].hours = 0;
-            data[key][index].bearbeitet_von = currentUser;
-            saveDataToSheet();
+            showLoading(true, "Aktualisiere...");
+            await supabaseClient
+                .from('eisen_kraemer_touren')
+                .update({ status: 'planned', stunden: 0, bearbeitet_von: currentUser })
+                .eq('id', id);
+
+            await fetchAllData();
+            showLoading(false);
+            render();
+            updateModalActiveDrivers();
         }
     }
 
-    function deleteAssignment(key, index) {
+    async function deleteAssignment(id) {
         if (confirm("Eintrag wirklich löschen?")) {
-            data[key].splice(index, 1);
-            if (data[key].length === 0) delete data[key];
-            saveDataToSheet();
-            closeModal();
+            showLoading(true, "Lösche...");
+            await supabaseClient
+                .from('eisen_kraemer_touren')
+                .delete()
+                .eq('id', id);
+
+            await fetchAllData();
+            showLoading(false);
+            render();
+            updateModalActiveDrivers();
         }
     }
 
