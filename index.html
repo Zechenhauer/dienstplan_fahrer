@@ -557,6 +557,7 @@
                 <thead>
                     <tr>
                         <th>Fahrer</th>
+                        <th style="text-align: center;">Geplante Touren</th>
                         <th>Geleistet</th>
                         <th>Übertrag</th>
                         <th>Gesamtbilanz (Soll: 40h)</th>
@@ -704,14 +705,8 @@
         }
         yearSelect.value = heute.getFullYear();
 
-        monthSelect.addEventListener('change', () => { updateActiveDayToMonthFirst(); render(); });
-        yearSelect.addEventListener('change', () => { updateActiveDayToMonthFirst(); render(); });
-    }
-
-    function updateActiveDayToMonthFirst() {
-        const selectedMonth = String(parseInt(monthSelect.value) + 1).padStart(2, '0');
-        const selectedYear = yearSelect.value;
-        activeSelectedDateStr = `${selectedYear}-${selectedMonth}-01`;
+        monthSelect.addEventListener('change', () => { render(); });
+        yearSelect.addEventListener('change', () => { render(); });
     }
 
     function checkSavedLogin() {
@@ -783,6 +778,12 @@
         document.getElementById('main-app').classList.remove('hidden');
         document.getElementById('user-display').innerText = `Angemeldet als: ${currentUser} ${isAdmin ? '(Admin)' : '(Fahrer)'}`;
         
+        // Auf heutiges Datum / aktuellen Monat beim Einloggen springen
+        const heute = new Date();
+        activeSelectedDateStr = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, '0')}-${String(heute.getDate()).padStart(2, '0')}`;
+        monthSelect.value = heute.getMonth();
+        yearSelect.value = heute.getFullYear();
+
         if (isAdmin) {
             document.body.classList.add('admin-mode');
             document.getElementById('worked-list-title').innerText = "Geleistete Stunden & Soll-Abgleich (Teamübersicht)";
@@ -795,7 +796,6 @@
     }
 
     async function fetchAllData() {
-        // 1. Touren laden
         let { data: tourenRows, error: err1 } = await supabaseClient
             .from('eisen_kraemer_touren')
             .select('*');
@@ -803,7 +803,6 @@
             tourenDaten = tourenRows;
         }
 
-        // 2. Config (Passwörter & Überträge) laden
         let { data: configRows, error: err2 } = await supabaseClient
             .from('eisen_kraemer_config')
             .select('*');
@@ -928,7 +927,7 @@
     async function updateCarryover(year, month, driver) {
         const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${driver}`;
         const currentVal = configDaten[mKey] !== undefined ? parseFloat(configDaten[mKey]) : 0.0;
-        const inputStr = prompt(`Übertrag (Plus- oder Minusstunden) für ${driver} im Monat ${months[month]} ${year} eingeben:\n(z.B. -5 für 5 Minusstunden oder 3.5 für Plus-Stunden)`, currentVal);
+        const inputStr = prompt(`Übertrag (Plus- or Minusstunden) für ${driver} im Monat ${months[month]} ${year} eingeben:\n(z.B. -5 für 5 Minusstunden oder 3.5 für Plus-Stunden)`, currentVal);
         
         if (inputStr !== null) {
             const val = parseFloat(inputStr.replace(',', '.'));
@@ -1007,30 +1006,41 @@
                 const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${f}`;
                 const carryoverVal = configDaten[mKey] !== undefined ? parseFloat(configDaten[mKey]) : 0.0;
 
-                fahrerStundenPool[f] = { total: 0.0, carryover: carryoverVal, touren: [] };
+                fahrerStundenPool[f] = { total: 0.0, carryover: carryoverVal, countPlannedTotal: 0, touren: [] };
             }
         });
 
         tourenDaten.forEach(assign => {
-            if (assign.datum && assign.datum.startsWith(prefix) && assign.status === 'worked') {
-                if (currentCalculatedDriverHours[assign.fahrer] !== undefined) {
-                    currentCalculatedDriverHours[assign.fahrer] += parseFloat(assign.stunden || 0);
-                }
+            if (assign.datum && assign.datum.startsWith(prefix)) {
                 if (fahrerStundenPool[assign.fahrer]) {
-                    const hrs = parseFloat(assign.stunden || 0);
-                    fahrerStundenPool[assign.fahrer].total += hrs;
-                    fahrerStundenPool[assign.fahrer].touren.push({
-                        id: assign.id,
-                        datum: assign.datum,
-                        tour: assign.tour,
-                        hours: hrs,
-                        editor: assign.bearbeitet_von || "Unbekannt"
-                    });
+                    fahrerStundenPool[assign.fahrer].countPlannedTotal++;
+                }
+
+                if (assign.status === 'worked') {
+                    if (currentCalculatedDriverHours[assign.fahrer] !== undefined) {
+                        currentCalculatedDriverHours[assign.fahrer] += parseFloat(assign.stunden || 0);
+                    }
+                    if (fahrerStundenPool[assign.fahrer]) {
+                        const hrs = parseFloat(assign.stunden || 0);
+                        fahrerStundenPool[assign.fahrer].total += hrs;
+                        fahrerStundenPool[assign.fahrer].touren.push({
+                            id: assign.id,
+                            datum: assign.datum,
+                            tour: assign.tour,
+                            hours: hrs,
+                            editor: assign.bearbeitet_von || "Unbekannt"
+                        });
+                    }
                 }
             }
         });
 
-        Object.keys(fahrerStundenPool).forEach(driver => {
+        // Nach Anzahl der geplanten Touren absteigend sortieren (die Meisten zuerst)
+        let sortedDrivers = Object.keys(fahrerStundenPool).sort((a, b) => {
+            return fahrerStundenPool[b].countPlannedTotal - fahrerStundenPool[a].countPlannedTotal;
+        });
+
+        sortedDrivers.forEach(driver => {
             const pool = fahrerStundenPool[driver];
             totalHoursAllDrivers += pool.total;
 
@@ -1044,7 +1054,7 @@
 
             let detailsHtml = "";
             if (openDriverDetails[driver]) {
-                detailsHtml = `<tr><td colspan="5"><table class="sub-details-table">`;
+                detailsHtml = `<tr><td colspan="6"><table class="sub-details-table">`;
                 
                 if (isAdmin) {
                     detailsHtml += `<tr><td colspan="4" style="background:#202020; padding:8px; display:flex; flex-direction:column; gap:6px;">
@@ -1079,6 +1089,7 @@
 
             tr.innerHTML = `
                 <td><span style="display:inline-block; width:8px; height:8px; background:${punktFarbe}; border-radius:50%; margin-right:6px;"></span><strong>${driver}</strong></td>
+                <td style="text-align: center; font-weight: bold; color: var(--accent-color);">${pool.countPlannedTotal}</td>
                 <td style="color: var(--success-color); font-weight: bold;">${pool.total.toFixed(2).replace('.', ',')} Std.</td>
                 <td style="color: ${pool.carryover >= 0 ? 'var(--text-color)' : 'var(--danger-color)'};">${carryoverFormatted}</td>
                 <td style="color: ${bilanzColor}; font-weight: bold; font-size: 0.95rem;">${bilanzSign}${bilanz.toFixed(2).replace('.', ',')} Std.</td>
@@ -1095,7 +1106,7 @@
             }
         });
 
-        const colSpan = isAdmin ? 5 : 4;
+        const colSpan = isAdmin ? 6 : 5;
         if (countPlanned === 0) plannedListBody.innerHTML = `<tr><td colspan="${colSpan}" class="no-entries">Keine geplanten Touren an diesem Tag. (Kalender anklicken zum Wechseln)</td></tr>`;
 
         totalHoursBadge.textContent = `${totalHoursAllDrivers.toFixed(2).replace('.', ',')} Std. Gesamt`;
@@ -1172,7 +1183,6 @@
 
         showLoading(true, "Speichere Tour...");
 
-        // Prüfen, ob der Fahrer an dem Tag schon eingeteilt ist
         let existing = tourenDaten.find(t => t.datum === activeSelectedDateStr && t.fahrer === fahrer);
 
         if (existing) {
