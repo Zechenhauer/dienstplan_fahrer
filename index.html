@@ -1006,14 +1006,15 @@
                 const mKey = `carryover_${year}_${String(month + 1).padStart(2, '0')}_${f}`;
                 const carryoverVal = configDaten[mKey] !== undefined ? parseFloat(configDaten[mKey]) : 0.0;
 
-                fahrerStundenPool[f] = { total: 0.0, carryover: carryoverVal, countPlannedTotal: 0, touren: [] };
+                fahrerStundenPool[f] = { total: 0.0, carryover: carryoverVal, countPlannedOnly: 0, touren: [] };
             }
         });
 
         tourenDaten.forEach(assign => {
             if (assign.datum && assign.datum.startsWith(prefix)) {
-                if (fahrerStundenPool[assign.fahrer]) {
-                    fahrerStundenPool[assign.fahrer].countPlannedTotal++;
+                // Zähle NUR Touren, die noch den Status 'planned' haben
+                if (assign.status === 'planned' && fahrerStundenPool[assign.fahrer]) {
+                    fahrerStundenPool[assign.fahrer].countPlannedOnly++;
                 }
 
                 if (assign.status === 'worked') {
@@ -1035,9 +1036,9 @@
             }
         });
 
-        // Nach Anzahl der geplanten Touren absteigend sortieren (die Meisten zuerst)
+        // Nach Anzahl der verbleibenden (geplanten) Touren absteigend sortieren
         let sortedDrivers = Object.keys(fahrerStundenPool).sort((a, b) => {
-            return fahrerStundenPool[b].countPlannedTotal - fahrerStundenPool[a].countPlannedTotal;
+            return fahrerStundenPool[b].countPlannedOnly - fahrerStundenPool[a].countPlannedOnly;
         });
 
         sortedDrivers.forEach(driver => {
@@ -1089,7 +1090,7 @@
 
             tr.innerHTML = `
                 <td><span style="display:inline-block; width:8px; height:8px; background:${punktFarbe}; border-radius:50%; margin-right:6px;"></span><strong>${driver}</strong></td>
-                <td style="text-align: center; font-weight: bold; color: var(--accent-color);">${pool.countPlannedTotal}</td>
+                <td style="text-align: center; font-weight: bold; color: var(--accent-color);">${pool.countPlannedOnly}</td>
                 <td style="color: var(--success-color); font-weight: bold;">${pool.total.toFixed(2).replace('.', ',')} Std.</td>
                 <td style="color: ${pool.carryover >= 0 ? 'var(--text-color)' : 'var(--danger-color)'};">${carryoverFormatted}</td>
                 <td style="color: ${bilanzColor}; font-weight: bold; font-size: 0.95rem;">${bilanzSign}${bilanz.toFixed(2).replace('.', ',')} Std.</td>
